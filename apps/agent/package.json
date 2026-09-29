@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@aroundus/core": "*",
+    "@aroundus/router": "*",
     "pg": "^8.23.0",
     "zod": "^4.6.5"
   }

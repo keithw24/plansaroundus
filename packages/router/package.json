@@ -1,0 +1,16 @@
+{
+  "name": "@aroundus/router",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@aroundus/core": "*",
+    "zod": "^4.6.5"
+  },
+  "scripts": {
+    "record:intents": "node --env-file-if-exists=../../.env scripts/record-intents.ts"
+  }
+}

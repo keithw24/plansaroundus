@@ -1,8 +1,10 @@
 import {
   ConfigError,
   createFlags,
+  createLlm,
   createLogger,
   describeMissing,
+  geminiGenerate,
   loadConfig,
 } from "@aroundus/core";
 import { createAgent } from "./agent.ts";
@@ -13,7 +15,7 @@ import {
   createPgContextStore,
 } from "./context-store.ts";
 import { createPgQuery } from "./pg.ts";
-import { cannedTurn } from "./replies.ts";
+import { createIntentPreviewTurn } from "./replies.ts";
 import { createTerminalAdapter } from "./terminal.ts";
 
 // Docker gives 10 s between SIGTERM and SIGKILL; leave room to close the database.
@@ -35,6 +37,7 @@ const missing = describeMissing(config);
 if (missing) log.warn(missing);
 
 const flags = createFlags(config.flags);
+const llm = config.gemini ? createLlm(geminiGenerate(config.gemini)) : null;
 
 let store: ContextStore;
 let closeDb = async () => {};
@@ -59,7 +62,7 @@ const agent = createAgent({
   channel,
   store,
   flags,
-  runTurn: cannedTurn,
+  runTurn: createIntentPreviewTurn(llm),
   log,
   inboxBatchMs: config.inboxBatchMs,
 });
