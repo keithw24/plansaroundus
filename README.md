@@ -1,6 +1,6 @@
 # Around Us: build plan from a new repo
 
-Status: **plan** (2026-09-29). Owner: Keith.
+Status: **plan** (2026-09-29). 
 
 This is how we would build Around Me again from an empty repo, in the order it should be built. It keeps the design that worked in `mvp/` and drops what didn't: DeepSpace, the split agent/backend and the three copies of user data.
 
@@ -29,6 +29,51 @@ One iMessage agent for NYC. A person shares a location and asks something. They 
 - **Location is required.** Without one, the agent asks once and calls no skills.
 
 **Not in scope:** payments, wallets, voice, long-term memory beyond the last location and recent lines, and more than one bot.
+
+### How a message flows
+
+```mermaid
+flowchart TD
+    user(["📱 iMessage<br/>shared location + a question"])
+    user --> adapter["<b>Chat adapter</b><br/>terminal now · Photon iMessage in phase 6"]
+    adapter --> inbox["<b>Inbox</b><br/>batches each chat for ~2 s"]
+    inbox --> turn{"<b>Turn handler</b>"}
+    memory[("<b>Chat memory</b><br/>last pin + recent lines")] <-.-> turn
+    turn -- "CODE 123456" --> signin["Website sign-in check"]
+    turn -- "group chat,<br/>no @agent" --> ignored(["ignored"])
+    turn --> intent["<b>Intent parser</b><br/>Gemini JSON · keyword fallback"]
+    intent --> where{"<b>Resolve location</b>"}
+    where -- "nothing asked" --> help["Help reply"]
+    where -- "no location" --> ask["“Where are you?”"]
+    where --> skills
+
+    subgraph skills ["Skills, in parallel · a broken one never breaks the reply"]
+        direction LR
+        safety["🛡️ <b>Safety</b><br/>NYPD history"]
+        food["🍜 <b>Food</b><br/>Google Places"]
+        events["🎟️ <b>Events</b><br/>NYC Parks + permits"]
+    end
+
+    skills --> route["🗺️ <b>Route</b><br/>to the destination or top pick"]
+    route --> compose["<b>Compose</b><br/>Gemini words the facts, nothing else"]
+    compose --> check{"<b>Grounding check</b>"}
+    check -- "fails" --> template["Template reply"]
+    check -- "passes" --> finalize
+    template --> finalize["<b>Finalize</b><br/>code adds links, travel time,<br/>“couldn't reach X”"]
+    finalize --> reply(["📱 One short reply"])
+    help --> reply
+    ask --> reply
+    signin --> reply
+
+    classDef built fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef planned fill:#f1f5f9,stroke:#94a3b8,color:#334155,stroke-dasharray:4 3
+    classDef io fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    class adapter,inbox,turn,memory,intent,where,help,ask built
+    class signin,safety,food,events,route,compose,check,template,finalize planned
+    class user,reply,ignored io
+```
+
+Green boxes are built (phases 1–3); dashed grey boxes are still to come. Sections 5 and 7 have the detailed versions.
 
 ## 2. Stack
 
