@@ -1,3 +1,5 @@
+import { normalizePhone, normalizeSender } from "./phone.ts";
+
 export const FLAGS = {
   "skill.safety": { default: true, about: "NYPD history" },
   "skill.events": { default: true, about: "NYC Parks + permitted events" },
@@ -29,9 +31,18 @@ export type FlagEnv = {
   FLAGS_BETA_PHONES?: string | undefined;
 };
 
+/** Flags as seen by one sender. Built once per turn and passed down. */
+export interface SenderFlags {
+  enabled(name: FlagName): boolean;
+}
+
 export interface Flags {
-  /** Beta flags are on only when `phone` is a beta phone. */
-  enabled(name: FlagName, ctx?: { phone?: string | undefined }): boolean;
+  /**
+   * Beta flags are on only for beta senders. `sender` is required so no call
+   * site can forget it; pass null when there is no sender (startup, jobs).
+   */
+  enabled(name: FlagName, ctx: { sender: string | null }): boolean;
+  forSender(sender: string | null): SenderFlags;
   /** Effective state of every flag, for /healthz. */
   effective(): Record<FlagName, FlagState>;
 }
@@ -86,38 +97,33 @@ export function parseFlagSettings(env: FlagEnv): { settings: FlagSettings; error
 }
 
 export function createFlags(settings: FlagSettings): Flags {
-  const state = {} as Record<FlagName, FlagState>;
+  const state = new Map<FlagName, FlagState>();
   for (const name of Object.keys(FLAGS) as FlagName[]) {
-    state[name] = FLAGS[name].default ? "on" : "off";
+    state.set(name, FLAGS[name].default ? "on" : "off");
   }
-  for (const name of settings.on) state[name] = "on";
-  for (const name of settings.off) state[name] = "off";
-  for (const name of settings.beta) state[name] = "beta";
+  for (const name of settings.on) state.set(name, "on");
+  for (const name of settings.off) state.set(name, "off");
+  for (const name of settings.beta) state.set(name, "beta");
 
   const betaPhones = new Set(settings.betaPhones);
+  const isBetaSender = (sender: string | null) => {
+    const normalized = sender ? normalizeSender(sender) : null;
+    return normalized !== null && betaPhones.has(normalized);
+  };
+  const check = (name: FlagName, beta: boolean) => {
+    const s = state.get(name);
+    if (s === undefined) throw new Error(`unknown flag "${name}"`);
+    return s === "beta" ? beta : s === "on";
+  };
 
   return {
-    enabled(name, ctx) {
-      const s = state[name];
-      if (s === undefined) throw new Error(`unknown flag "${name}"`);
-      if (s !== "beta") return s === "on";
-      const phone = ctx?.phone ? normalizePhone(ctx.phone) : null;
-      return phone !== null && betaPhones.has(phone);
+    enabled: (name, { sender }) => check(name, isBetaSender(sender)),
+    forSender(sender) {
+      const beta = isBetaSender(sender);
+      return { enabled: (name) => check(name, beta) };
     },
-    effective: () => ({ ...state }),
+    effective: () => Object.fromEntries(state) as Record<FlagName, FlagState>,
   };
-}
-
-/** "+1 (917) 555-0142", "917-555-0142" → "+19175550142". Returns null if it isn't a plausible E.164 number. */
-export function normalizePhone(raw: string): string | null {
-  const trimmed = raw.trim();
-  const digits = trimmed.replace(/[\s().-]/g, "");
-  let e164: string;
-  if (digits.startsWith("+")) e164 = digits;
-  else if (/^\d{10}$/.test(digits)) e164 = `+1${digits}`;
-  else if (/^1\d{10}$/.test(digits)) e164 = `+${digits}`;
-  else return null;
-  return /^\+[1-9]\d{7,14}$/.test(e164) ? e164 : null;
 }
 
 function splitList(value: string | undefined): string[] {

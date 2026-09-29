@@ -1,49 +1,51 @@
 import { z } from "zod";
+import type { SkillName } from "./contracts.ts";
 import { type FlagSettings, parseFlagSettings } from "./flags.ts";
 import { LOG_LEVELS, type LogLevel } from "./logger.ts";
 
-// Blank values in .env ("GEMINI_API_KEY=") count as unset.
-const optionalString = z.preprocess(
-  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
-  z.string().trim().optional(),
-);
+// Every value is trimmed, and blank ("GEMINI_API_KEY=") counts as unset.
+const blankToUndefined = (v: unknown) => {
+  if (typeof v !== "string") return v;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+};
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess(blankToUndefined, schema.optional());
 const withDefault = <T extends z.ZodType>(schema: T, fallback: z.input<T>) =>
-  z.preprocess(
-    (v) => (v === undefined || (typeof v === "string" && v.trim() === "") ? fallback : v),
-    schema,
-  );
+  z.preprocess((v) => blankToUndefined(v) ?? fallback, schema);
 
 const Env = z.object({
   NODE_ENV: withDefault(z.enum(["development", "test", "production"]), "development"),
   LOG_LEVEL: withDefault(z.enum(LOG_LEVELS), "info"),
-  PORT: withDefault(z.coerce.number().int().min(1).max(65535), "8787"),
-
-  CHAT_PROVIDER: withDefault(z.enum(["terminal", "photon"]), "terminal"),
-  PHOTON_PROJECT_ID: optionalString,
-  PHOTON_API_KEY: optionalString,
-
-  GEMINI_API_KEY: optionalString,
-  GEMINI_MODEL: withDefault(z.string().min(1), "gemini-flash-latest"),
-  GOOGLE_MAPS_API_KEY: optionalString,
-  DATABASE_URL: optionalString.pipe(
+  PORT: withDefault(
     z
       .string()
-      .regex(/^postgres(ql)?:\/\//, "must be a postgres:// URL")
-      .optional(),
+      .regex(/^\d+$/, "must be a whole number")
+      .transform(Number)
+      .pipe(z.number().int().min(1).max(65535)),
+    "8787",
   ),
 
-  RESEND_API_KEY: optionalString,
-  RESEND_FROM: optionalString,
-  SITE_AUTH_SECRET: optionalString.pipe(
-    z.string().min(32, "must be at least 32 characters").optional(),
-  ),
-  SITE_ORIGINS: optionalString,
+  CHAT_PROVIDER: withDefault(z.enum(["terminal", "photon"]), "terminal"),
+  PHOTON_PROJECT_ID: optional(z.string()),
+  PHOTON_API_KEY: optional(z.string()),
 
-  FLAGS_ON: optionalString,
-  FLAGS_OFF: optionalString,
-  FLAGS_BETA: optionalString,
-  FLAGS_BETA_PHONES: optionalString,
+  GEMINI_API_KEY: optional(z.string()),
+  GEMINI_MODEL: withDefault(z.string(), "gemini-flash-latest"),
+  GOOGLE_MAPS_API_KEY: optional(z.string()),
+  DATABASE_URL: optional(z.string().regex(/^postgres(ql)?:\/\//, "must be a postgres:// URL")),
+
+  RESEND_API_KEY: optional(z.string()),
+  RESEND_FROM: optional(z.string()),
+  SITE_AUTH_SECRET: optional(z.string().min(32, "must be at least 32 characters")),
+  SITE_ORIGINS: optional(z.string()),
+
+  FLAGS_ON: optional(z.string()),
+  FLAGS_OFF: optional(z.string()),
+  FLAGS_BETA: optional(z.string()),
+  FLAGS_BETA_PHONES: optional(z.string()),
 });
+type Env = z.output<typeof Env>;
 
 /** Keys the agent can run without, each switching off something specific. */
 const OPTIONAL_KEYS = [
@@ -53,6 +55,17 @@ const OPTIONAL_KEYS = [
   "RESEND_API_KEY",
   "SITE_AUTH_SECRET",
 ] as const;
+
+/**
+ * What each skill needs configured to run at all. Route has no hard need:
+ * without a Maps key it still returns a directions link, just no duration.
+ */
+const SKILL_NEEDS: Record<SkillName, readonly (typeof OPTIONAL_KEYS)[number][]> = {
+  safety: ["DATABASE_URL"],
+  events: ["DATABASE_URL"],
+  food: ["GOOGLE_MAPS_API_KEY"],
+  route: [],
+};
 
 export type Config = {
   env: "development" | "test" | "production";
@@ -67,6 +80,8 @@ export type Config = {
   flags: FlagSettings;
   /** Optional keys that are unset, e.g. ["GOOGLE_MAPS_API_KEY"]. */
   missing: string[];
+  /** Keys each skill is missing; an empty list means it can run. */
+  skillsMissing: Record<SkillName, string[]>;
 };
 
 export class ConfigError extends Error {
@@ -79,49 +94,57 @@ export class ConfigError extends Error {
 }
 
 /**
- * Validates env into a typed Config. Pass `process.env` from an app; nothing
- * in packages/ reads it directly. Throws ConfigError listing every problem.
+ * Validates env into a typed Config. Apps pass in the process environment; nothing
+ * in packages/ reads it directly. Throws one ConfigError listing every problem.
  */
 export function loadConfig(raw: Record<string, string | undefined>): Config {
-  const parsed = Env.safeParse(raw);
-  if (!parsed.success) {
-    throw new ConfigError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`));
-  }
-  const env = parsed.data;
   const issues: string[] = [];
 
-  const { settings: flags, errors: flagErrors } = parseFlagSettings(env);
+  const parsed = Env.safeParse(raw);
+  if (!parsed.success) {
+    issues.push(...parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`));
+  }
+
+  // Cross-field checks read the trimmed raw strings, so they run even when a
+  // field above failed and every problem is reported in one go.
+  const get = (key: keyof Env): string | undefined =>
+    blankToUndefined(raw[key]) as string | undefined;
+
+  const { settings: flags, errors: flagErrors } = parseFlagSettings({
+    FLAGS_ON: get("FLAGS_ON"),
+    FLAGS_OFF: get("FLAGS_OFF"),
+    FLAGS_BETA: get("FLAGS_BETA"),
+    FLAGS_BETA_PHONES: get("FLAGS_BETA_PHONES"),
+  });
   issues.push(...flagErrors);
 
   // The live channel must be fully configured; a half-set Photon would drop messages.
-  let chat: Config["chat"] = { provider: "terminal" };
-  if (env.CHAT_PROVIDER === "photon") {
-    const needed = {
-      PHOTON_PROJECT_ID: env.PHOTON_PROJECT_ID,
-      PHOTON_API_KEY: env.PHOTON_API_KEY,
-      DATABASE_URL: env.DATABASE_URL,
-    };
-    for (const [key, value] of Object.entries(needed)) {
-      if (!value) issues.push(`${key}: required when CHAT_PROVIDER=photon`);
-    }
-    if (env.PHOTON_PROJECT_ID && env.PHOTON_API_KEY) {
-      chat = { provider: "photon", projectId: env.PHOTON_PROJECT_ID, apiKey: env.PHOTON_API_KEY };
+  if (get("CHAT_PROVIDER") === "photon") {
+    for (const key of ["PHOTON_PROJECT_ID", "PHOTON_API_KEY", "DATABASE_URL"] as const) {
+      if (!get(key)) issues.push(`${key}: required when CHAT_PROVIDER=photon`);
     }
   }
-
-  if (env.RESEND_API_KEY && !env.RESEND_FROM)
+  if (get("RESEND_API_KEY") && !get("RESEND_FROM")) {
     issues.push("RESEND_FROM: required when RESEND_API_KEY is set");
-
-  const origins = (env.SITE_ORIGINS ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  for (const origin of origins) {
-    if (!isOrigin(origin))
-      issues.push(`SITE_ORIGINS: "${origin}" is not an origin like https://example.com`);
   }
 
-  if (issues.length > 0) throw new ConfigError(issues);
+  const origins: string[] = [];
+  for (const entry of (get("SITE_ORIGINS") ?? "").split(",")) {
+    const value = entry.trim();
+    if (!value) continue;
+    const origin = toOrigin(value);
+    if (origin) origins.push(origin);
+    else issues.push(`SITE_ORIGINS: "${value}" is not an origin like https://example.com`);
+  }
+
+  if (issues.length > 0 || !parsed.success) throw new ConfigError(issues);
+  const env = parsed.data;
+
+  const chat: Config["chat"] =
+    env.CHAT_PROVIDER === "photon" && env.PHOTON_PROJECT_ID && env.PHOTON_API_KEY
+      ? { provider: "photon", projectId: env.PHOTON_PROJECT_ID, apiKey: env.PHOTON_API_KEY }
+      : { provider: "terminal" };
+  const missing = OPTIONAL_KEYS.filter((key) => !env[key]);
 
   return {
     env: env.NODE_ENV,
@@ -137,7 +160,13 @@ export function loadConfig(raw: Record<string, string | undefined>): Config {
         : null,
     site: { authSecret: env.SITE_AUTH_SECRET ?? null, origins },
     flags,
-    missing: OPTIONAL_KEYS.filter((key) => !env[key]),
+    missing,
+    skillsMissing: {
+      safety: SKILL_NEEDS.safety.filter((k) => missing.includes(k)),
+      events: SKILL_NEEDS.events.filter((k) => missing.includes(k)),
+      food: SKILL_NEEDS.food.filter((k) => missing.includes(k)),
+      route: SKILL_NEEDS.route.filter((k) => missing.includes(k)),
+    },
   };
 }
 
@@ -146,11 +175,14 @@ export function describeMissing(config: Config): string | null {
   return config.missing.length > 0 ? `Running without: ${config.missing.join(", ")}` : null;
 }
 
-function isOrigin(value: string): boolean {
+/** "https://AroundUs.nyc/" → "https://aroundus.nyc". Null if it has a path, query or credentials. */
+function toOrigin(value: string): string | null {
   try {
     const url = new URL(value);
-    return (url.protocol === "https:" || url.protocol === "http:") && url.origin === value;
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (url.pathname !== "/" || url.search || url.hash || url.username || url.password) return null;
+    return url.origin;
   } catch {
-    return false;
+    return null;
   }
 }
