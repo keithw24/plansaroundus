@@ -45,6 +45,10 @@ describe("intent preview turn", () => {
     expect(await turn(input("directions please", pin))).toBe(WHERE_TO);
   });
 
+  it("safety plus route with no destination also asks where to", async () => {
+    expect(await turn(input("is it safe to walk there? directions?", pin))).toBe(WHERE_TO);
+  });
+
   it("describes a full plan near the shared pin", async () => {
     expect(await turn(input("plan a fun and safe night", pin))).toBe(
       "Got it: safety + food + events near your shared location, now. Real answers come in the next build.",

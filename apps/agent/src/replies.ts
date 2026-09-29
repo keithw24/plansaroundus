@@ -28,7 +28,7 @@ export const cannedTurn: TurnRunner = async ({ lastLocation }) =>
  */
 export function createIntentPreviewTurn(llm: Llm | null): TurnRunner {
   return async ({ text, lastLocation, recent, flags, log, signal }) => {
-    const { intent, source, fallback } = await parseIntent({
+    const { intent, source, fallback, locationFromRecent } = await parseIntent({
       text,
       recent,
       flags,
@@ -36,12 +36,22 @@ export function createIntentPreviewTurn(llm: Llm | null): TurnRunner {
       log,
       signal,
     });
-    log.info("intent", { source, fallback, intent });
+    // Never the place names or other user words: logs aren't chat memory.
+    log.info("intent", {
+      source,
+      fallback,
+      needs: intent.needs,
+      hasLocation: Boolean(intent.locationQuery),
+      locationFromRecent,
+      hasDestination: Boolean(intent.destinationQuery),
+    });
 
     if (intent.needs.length === 0) return HELP;
     if (!intent.locationQuery && !lastLocation) return WHERE_ARE_YOU;
-    const routeOnly = intent.needs.length === 1 && intent.needs[0] === "route";
-    if (routeOnly && !intent.destinationQuery) return WHERE_TO;
+    // A route needs a destination, or a food/events pick to route to.
+    const hasPickToRoute = intent.needs.includes("food") || intent.needs.includes("events");
+    if (intent.needs.includes("route") && !intent.destinationQuery && !hasPickToRoute)
+      return WHERE_TO;
     return describeIntent(intent, lastLocation ? lastLocation.label : null);
   };
 }

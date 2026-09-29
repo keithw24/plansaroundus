@@ -1,27 +1,146 @@
 {
   "model": "gemini-flash-lite-latest",
-  "recordedAt": "2026-09-29T16:20:38.196Z",
+  "recordedAt": "2026-09-29T16:39:43.399Z",
   "replies": {
-    "Is it safe around me?": "{\n  \"needs\": [\n    \"safety\"\n  ],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "Where should we get dinner?": "{\n  \"needs\": [\n    \"food\"\n  ],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "What fun stuff is nearby tonight?": "{\n  \"needs\": [\n    \"events\"\n  ],\n  \"when\": \"tonight\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "How do I get to Jin Ramen?": "{\n  \"needs\": [\n    \"route\"\n  ],\n  \"destinationQuery\": \"Jin Ramen\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "Plan a fun and safe night near Columbia": "{\n  \"needs\": [\n    \"events\",\n    \"food\",\n    \"safety\"\n  ],\n  \"locationQuery\": \"Columbia\",\n  \"when\": \"tonight\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "hi": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "thanks!": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "what's the weather like": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "who are you?": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "is it sketchy near washington square park at night?": "{\n  \"needs\": [\n    \"safety\"\n  ],\n  \"locationQuery\": \"washington square park\",\n  \"when\": \"at night\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "cheap ramen near Columbia": "{\n  \"needs\": [\n    \"food\"\n  ],\n  \"locationQuery\": \"Columbia\",\n  \"when\": \"now\",\n  \"budget\": \"low\",\n  \"categories\": [],\n  \"cuisine\": [\n    \"ramen\"\n  ]\n}",
-    "any comedy shows tonight in the West Village?": "{\n  \"needs\": [\n    \"events\"\n  ],\n  \"locationQuery\": \"the West Village\",\n  \"when\": \"tonight\",\n  \"categories\": [\n    \"comedy\"\n  ],\n  \"cuisine\": []\n}",
-    "directions to Central Park by subway": "{\n  \"needs\": [\n    \"route\"\n  ],\n  \"destinationQuery\": \"Central Park\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": [],\n  \"travelMode\": \"TRANSIT\"\n}",
-    "where can I grab a bite, and is it safe there?": "{\n  \"needs\": [\n    \"food\",\n    \"safety\"\n  ],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "free concerts this weekend": "{\n  \"needs\": [\n    \"events\"\n  ],\n  \"when\": \"this weekend\",\n  \"budget\": \"free\",\n  \"categories\": [\n    \"music\",\n    \"concerts\"\n  ],\n  \"cuisine\": []\n}",
-    "how long to walk to the Met from here": "{\n  \"needs\": [\n    \"route\"\n  ],\n  \"destinationQuery\": \"the Met\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": [],\n  \"travelMode\": \"WALK\"\n}",
-    "what's happening in Brooklyn tomorrow evening": "{\n  \"needs\": [\"events\"],\n  \"locationQuery\": \"Brooklyn\",\n  \"when\": \"tomorrow evening\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "good pizza?": "{\n  \"needs\": [\"food\"],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": [\"pizza\"]\n}",
-    "what about sushi instead?": "{\n  \"needs\": [\n    \"food\"\n  ],\n  \"locationQuery\": \"Columbia\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": [\n    \"sushi\"\n  ]\n}",
-    "plan a date night in the East Village": "{\n  \"needs\": [\n    \"events\",\n    \"food\",\n    \"safety\"\n  ],\n  \"locationQuery\": \"the East Village\",\n  \"when\": \"tonight\",\n  \"categories\": [],\n  \"cuisine\": []\n}",
-    "is it safe to walk to Jin Ramen from here at 11pm?": "{\n  \"needs\": [\n    \"safety\",\n    \"route\"\n  ],\n  \"destinationQuery\": \"Jin Ramen\",\n  \"when\": \"at 11pm\",\n  \"categories\": [],\n  \"cuisine\": [],\n  \"travelMode\": \"WALK\"\n}"
+    "374bb05d9f927f9a": {
+      "message": "Is it safe around me?",
+      "reply": "{\"needs\":[\"safety\"],\"when\":\"now\",\"categories\":[],\"cuisine\":[]}"
+    },
+    "bd026a157ab1e81c": {
+      "message": "Where should we get dinner?",
+      "reply": "{\n  \"needs\": [\n    \"food\"\n  ],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "af04a4bfbe02ab53": {
+      "message": "What fun stuff is nearby tonight?",
+      "reply": "{\n  \"needs\": [\n    \"events\"\n  ],\n  \"when\": \"tonight\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "bcf341e5a68d0480": {
+      "message": "How do I get to Jin Ramen?",
+      "reply": "{\n  \"needs\": [\"route\"],\n  \"destinationQuery\": \"Jin Ramen\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "3906b01fc1b06f70": {
+      "message": "Plan a fun and safe night near Columbia",
+      "reply": "{\n  \"needs\": [\"events\", \"food\", \"safety\"],\n  \"locationQuery\": \"Columbia\",\n  \"when\": \"tonight\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "f4c9504cf67708e4": {
+      "message": "hi",
+      "reply": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "9acd1d03f5f037be": {
+      "message": "thanks!",
+      "reply": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "ed5773b16f2b0d58": {
+      "message": "what's the weather like",
+      "reply": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "9234961520a82aaf": {
+      "message": "who are you?",
+      "reply": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "5003659b04d2cb92": {
+      "message": "safe travels!",
+      "reply": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "b8b07bd84c5bc623": {
+      "message": "lol that's fun",
+      "reply": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "e2b589248399f766": {
+      "message": "have fun at the game!",
+      "reply": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "246aa09ec0b9212a": {
+      "message": "going to be late sorry",
+      "reply": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "2eb0ca08a46824c2": {
+      "message": "how long have you lived here",
+      "reply": "{\n  \"needs\": [],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "2669e57a999bab62": {
+      "message": "is it sketchy near washington square park at night?",
+      "reply": "{\n  \"needs\": [\n    \"safety\"\n  ],\n  \"locationQuery\": \"washington square park\",\n  \"when\": \"at night\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "f66ffa2af99e6f75": {
+      "message": "near Times Square safe?",
+      "reply": "{\n  \"needs\": [\n    \"safety\"\n  ],\n  \"locationQuery\": \"Times Square\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "422ceaffde82370d": {
+      "message": "is Prospect Park safe after dark",
+      "reply": "{\n  \"needs\": [\n    \"safety\"\n  ],\n  \"locationQuery\": \"Prospect Park\",\n  \"when\": \"after dark\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "b387b7ec909fbbab": {
+      "message": "cheap ramen near Columbia",
+      "reply": "{\n  \"needs\": [\n    \"food\"\n  ],\n  \"locationQuery\": \"Columbia\",\n  \"when\": \"now\",\n  \"budget\": \"low\",\n  \"categories\": [],\n  \"cuisine\": [\n    \"ramen\"\n  ]\n}"
+    },
+    "660bde052f721e71": {
+      "message": "dumplings in Chinatown",
+      "reply": "{\n  \"needs\": [\n    \"food\"\n  ],\n  \"locationQuery\": \"Chinatown\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": [\n    \"dumplings\"\n  ]\n}"
+    },
+    "daeaa634cbde91a7": {
+      "message": "restaurants near me in Harlem",
+      "reply": "{\n  \"needs\": [\n    \"food\"\n  ],\n  \"locationQuery\": \"Harlem\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "f512259045985ef2": {
+      "message": "any restaurants open now around here?",
+      "reply": "{\n  \"needs\": [\"food\"],\n  \"when\": \"now\",\n  \"openNow\": true,\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "3bd7eeaa0da2a394": {
+      "message": "good pizza?",
+      "reply": "{\n  \"needs\": [\n    \"food\"\n  ],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": [\n    \"pizza\"\n  ]\n}"
+    },
+    "df7c871e6aaf1f9c": {
+      "message": "any comedy shows tonight in the West Village?",
+      "reply": "{\n  \"needs\": [\n    \"events\"\n  ],\n  \"locationQuery\": \"West Village\",\n  \"when\": \"tonight\",\n  \"categories\": [\n    \"comedy\"\n  ],\n  \"cuisine\": []\n}"
+    },
+    "83b2481924ede441": {
+      "message": "free concerts this weekend",
+      "reply": "{\n  \"needs\": [\"events\"],\n  \"when\": \"this weekend\",\n  \"budget\": \"free\",\n  \"categories\": [\"concerts\"],\n  \"cuisine\": []\n}"
+    },
+    "6cdfb8c8dd9e918f": {
+      "message": "things to do around 8pm",
+      "reply": "{\n  \"needs\": [\n    \"events\"\n  ],\n  \"when\": \"at 8pm\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "adaacb421abe9d32": {
+      "message": "what's happening in Brooklyn tomorrow evening",
+      "reply": "{\n  \"needs\": [\"events\"],\n  \"locationQuery\": \"Brooklyn\",\n  \"when\": \"tomorrow evening\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "e813aa7bfeb7d208": {
+      "message": "directions to Central Park by subway",
+      "reply": "{\n  \"needs\": [\"route\"],\n  \"destinationQuery\": \"Central Park\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": [],\n  \"travelMode\": \"TRANSIT\"\n}"
+    },
+    "bab3400c855d176c": {
+      "message": "how long to walk to the Met from here",
+      "reply": "{\n  \"needs\": [\n    \"route\"\n  ],\n  \"destinationQuery\": \"the Met\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": [],\n  \"travelMode\": \"WALK\"\n}"
+    },
+    "c6530ae6cdb0ca10": {
+      "message": "how far is it to Times Square",
+      "reply": "{\n  \"needs\": [\n    \"route\"\n  ],\n  \"destinationQuery\": \"Times Square\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "882827ef7c3587f3": {
+      "message": "take me to Joe's Pizza",
+      "reply": "{\n  \"needs\": [\"route\"],\n  \"destinationQuery\": \"Joe's Pizza\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "30b2690b703d0ec5": {
+      "message": "where can I grab a bite, and is it safe there?",
+      "reply": "{\n  \"needs\": [\n    \"food\",\n    \"safety\"\n  ],\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "d260af8bee0a0793": {
+      "message": "plan a date night in the East Village",
+      "reply": "{\n  \"needs\": [\n    \"events\",\n    \"food\",\n    \"safety\"\n  ],\n  \"locationQuery\": \"East Village\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "c4a2c618cb773e14": {
+      "message": "what should we do tonight",
+      "reply": "{\n  \"needs\": [\n    \"events\",\n    \"food\",\n    \"safety\"\n  ],\n  \"when\": \"tonight\",\n  \"categories\": [],\n  \"cuisine\": []\n}"
+    },
+    "93c468648ff8fba5": {
+      "message": "is it safe to walk to Jin Ramen from here at 11pm?",
+      "reply": "{\n  \"needs\": [\"safety\", \"route\"],\n  \"destinationQuery\": \"Jin Ramen\",\n  \"when\": \"at 11pm\",\n  \"categories\": [],\n  \"cuisine\": [],\n  \"travelMode\": \"WALK\"\n}"
+    },
+    "f5354c478a16e933": {
+      "message": "what about sushi instead?",
+      "reply": "{\n  \"needs\": [\n    \"food\"\n  ],\n  \"locationQuery\": \"Columbia\",\n  \"when\": \"now\",\n  \"categories\": [],\n  \"cuisine\": [\n    \"sushi\"\n  ]\n}"
+    }
   }
 }

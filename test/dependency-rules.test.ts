@@ -1,10 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // README section 3: skills import only core and zod, the router reaches skills
 // only through the registry type, and only apps/ read process.env.
-// Runtime code only: test/ and dev-only scripts/ (never imported) are skipped.
+// Runtime code only: test/ and each package's dev-only scripts/ are skipped.
 const root = join(import.meta.dirname, "..");
 
 function sourceFiles(dir: string): string[] {
@@ -16,10 +16,16 @@ function sourceFiles(dir: string): string[] {
   }
   return entries.flatMap((e) => {
     const path = join(dir, e.name);
-    if (e.isDirectory())
-      return ["node_modules", "test", "scripts"].includes(e.name) ? [] : sourceFiles(path);
+    if (e.isDirectory()) return skipDir(dir, e.name) ? [] : sourceFiles(path);
     return /\.tsx?$/.test(e.name) ? [path] : [];
   });
+}
+
+// Dev-only scripts/ are skipped only at a package root (next to package.json),
+// so a src/scripts/ folder is still checked.
+function skipDir(parent: string, name: string): boolean {
+  if (name === "node_modules" || name === "test") return true;
+  return name === "scripts" && existsSync(join(parent, "package.json"));
 }
 
 function imports(file: string): string[] {

@@ -154,6 +154,7 @@ const UserIntent = z.object({
   destinationQuery: z.string().optional(),  // for route requests
   when: z.string(),                         // "now", "tonight", "at 9pm"
   budget: z.enum(["free", "low", "medium", "high"]).optional(),
+  openNow: z.boolean().optional(),          // "anything open late?"
   categories: z.array(z.string()),          // "music", "outdoors"
   cuisine: z.array(z.string()),             // "ramen"
   travelMode: z.enum(["WALK", "TRANSIT", "DRIVE", "BICYCLE"]).optional(), // only if stated
@@ -165,7 +166,8 @@ const UserIntent = z.object({
 - **8 s timeout, then a keyword fallback** (`heuristicIntent`). Focused questions still work when Gemini is down. We hit Gemini 503s during testing, so this path is used in practice.
 - **Locations are free text here.** The graph resolves them, so Gemini never produces coordinates.
 
-- **Code checks every intent,** from either path: a place is kept only if the user actually wrote it (in the message or their recent lines), needs are deduplicated, lists cleaned. `travelMode` is optional so the graph's walk-vs-transit rule applies when the user didn't say.
+- **Code checks every intent,** from either path: a place is kept only if the user actually wrote it as whole words (in the message or their own recent lines; "me"/"here" never count), needs are deduplicated, lists cleaned. A place carried over from recent lines is flagged (`locationFromRecent`) so a pin shared this turn can win over it.
+- **The keyword parser only picks skills for messages that ask for something** (a question, a request, or a named place), so small talk like "safe travels!" or "that was fun" calls nothing. `travelMode` is optional so the graph's walk-vs-transit rule applies when the user didn't say.
 - **Built in `packages/router` (`intent.ts`, `heuristic.ts`).** Until phase 4, the agent answers with a preview of what it understood.
 
 **Tests:** a table of about 20 prompts → expected `needs`, run against both the Gemini path (with a recorded response) and the heuristic. It covers safety-only, food-only, events-only, route-only, the combined plan, small talk and a missing location. The Gemini replies are real, recorded with `npm run record:intents -w @aroundus/router` (needs `GEMINI_API_KEY`) into `packages/router/test/fixtures/`, and replayed offline. Re-record after changing the schema or prompt.
