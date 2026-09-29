@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 // README section 3: skills import only core and zod, the router reaches skills
 // only through the registry type, and only apps/ read process.env.
+// Runtime code only: test/ and dev-only scripts/ (never imported) are skipped.
 const root = join(import.meta.dirname, "..");
 
 function sourceFiles(dir: string): string[] {
@@ -16,7 +17,7 @@ function sourceFiles(dir: string): string[] {
   return entries.flatMap((e) => {
     const path = join(dir, e.name);
     if (e.isDirectory())
-      return e.name === "node_modules" || e.name === "test" ? [] : sourceFiles(path);
+      return ["node_modules", "test", "scripts"].includes(e.name) ? [] : sourceFiles(path);
     return /\.tsx?$/.test(e.name) ? [path] : [];
   });
 }
