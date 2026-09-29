@@ -99,9 +99,6 @@ type Recommendation = EventRecommendation | FoodRecommendation;
 
 Each skill's input and output schema also lives in core (`skills.ts`, `SKILL_IO`), with a `SkillRegistry` type tying each name to its own types, so the router and the four skill packages build against the same shapes.
 
-```ts
-```
-
 Also in core:
 
 | Module | Does |
@@ -109,11 +106,10 @@ Also in core:
 | `config.ts` | One zod schema for every env var. Refuses to start the live channel half-configured. Reports which optional keys are missing ("Running without: GOOGLE_MAPS_API_KEY"). |
 | `flags.ts` | Feature flags (section 10). |
 | `llm.ts` | `llm.json({ system, prompt, schema, timeoutMs })`: calls Gemini in JSON mode, validates with zod, throws on timeout or bad output. Callers always have a fallback. |
-| `db.ts` | A pg pool behind a small `Query` function that skills receive through their factory. |
+| `db.ts` | The `Query` type: a small function over a pg pool that skills receive through their factory. The pool itself lives in `apps/`. |
 | `time.ts` | "tonight" / "at 9pm" / "tomorrow evening" → an hour and a from/to window in America/New_York. |
 | `geo.ts` | Haversine distance, parsing `lat,lng` and Maps links into coordinates. |
 | `places.ts` | A geocoder: named place → `Location`, via Places Text Search. |
-| `db.ts` | The `Query` type. |
 | `phone.ts` | Phone and sender normalization (iMessage senders can be emails). |
 | `skills.ts` | Per-skill input/output schemas and the `SkillRegistry` type. |
 
@@ -140,10 +136,12 @@ TurnHandler
 |---|---|
 | `ChannelAdapter` | `{ start(onMessage), send(spaceId, text), sendTo(phone, text) }` |
 | Terminal adapter | stdin/stdout. Pasting `40.8,-73.96` counts as a shared location. This is the dev loop for everything that follows. |
-| Photon adapter | `spectrum-ts` with iMessage. Reads text, rich links and location vCards. Skips outbound and agent messages. Built in phase 9. |
+| Photon adapter | `spectrum-ts` with iMessage. Reads text, rich links and location vCards. Skips outbound and agent messages. Built in phase 6 (milestone 9). |
 | `ContextStore` | Per chat: last location and the last ~6 message lines. Postgres table `app.chat_context`. Never stores phone numbers. In-memory version for tests. |
 
 **Done when:** in the terminal, pasting a location then "hi" returns a canned help reply, and a question with no location returns "Where are you?"
+
+**Running it:** `npm start -w @aroundus/agent` (reads `.env` if present). No keys are needed. In the terminal, `/group on|off` and `/sender <phone or email>` exercise the group-chat and beta-flag paths. With `DATABASE_URL` set (plus `CHAT_KEY_SECRET`, which keys stored chat ids), run `npm run migrate -w @aroundus/agent` first; without it, chat memory is in-process. `INBOX_BATCH_MS` sets the batching window. In group chats each sender is batched separately, a pin with no text waits a little longer for the question that usually follows, and messages that arrive mid-turn go into one follow-up batch.
 
 ## 6. Phase 3: Gemini intent parser (`router/intent.ts`)
 

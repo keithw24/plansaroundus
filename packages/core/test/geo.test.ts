@@ -22,12 +22,19 @@ describe("parseCoordinates", () => {
     expect(parseCoordinates(text)).toEqual(expected);
   });
 
-  it.each(["hi", "91,0", "40.8,-181", "12,34 please", "https://example.com", "40.8"])(
-    "rejects %s",
-    (text) => {
-      expect(parseCoordinates(text)).toBeNull();
-    },
-  );
+  it.each([
+    "hi",
+    "91.0,0.0",
+    "40.8,-181.0",
+    "12,34 please",
+    "https://example.com",
+    "40.8",
+    "10,000",
+    "3, 4",
+    "40,-73",
+  ])("rejects %s", (text) => {
+    expect(parseCoordinates(text)).toBeNull();
+  });
 });
 
 describe("haversineMeters", () => {

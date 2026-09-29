@@ -1,4 +1,4 @@
-import { normalizePhone, normalizeSender } from "./phone.ts";
+import { normalizeSender } from "./phone.ts";
 
 export const FLAGS = {
   "skill.safety": { default: true, about: "NYPD history" },
@@ -20,7 +20,7 @@ export type FlagSettings = {
   on: FlagName[];
   off: FlagName[];
   beta: FlagName[];
-  /** E.164 numbers, already normalized. */
+  /** Normalized senders: E.164 numbers or lower-cased emails. */
   betaPhones: string[];
 };
 
@@ -83,9 +83,10 @@ export function parseFlagSettings(env: FlagEnv): { settings: FlagSettings; error
   }
 
   for (const raw of splitList(env.FLAGS_BETA_PHONES)) {
-    const phone = normalizePhone(raw);
-    if (phone) settings.betaPhones.push(phone);
-    else errors.push(`FLAGS_BETA_PHONES: "${raw}" is not a phone number`);
+    // iMessage senders can be Apple ID emails, so those are accepted too.
+    const sender = normalizeSender(raw);
+    if (sender) settings.betaPhones.push(sender);
+    else errors.push(`FLAGS_BETA_PHONES: "${raw}" is not a phone number or email`);
   }
   if (settings.beta.length > 0 && settings.betaPhones.length === 0) {
     errors.push(

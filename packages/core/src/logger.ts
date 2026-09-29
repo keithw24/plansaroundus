@@ -21,8 +21,16 @@ export function createLogger(
 
   const log = (level: LogLevel) => (msg: string, fields?: LogFields) => {
     if (LOG_LEVELS.indexOf(level) < min) return;
-    // time/level/msg go last so fields can't overwrite them.
-    write(safeStringify({ ...base, ...fields, time: new Date().toISOString(), level, msg }));
+    const time = new Date().toISOString();
+    let line: string;
+    try {
+      // time/level/msg go last so fields can't overwrite them.
+      line = JSON.stringify(toJsonSafe({ ...base, ...fields, time, level, msg }, []));
+    } catch (err) {
+      // A log call must never throw (e.g. a throwing getter in fields).
+      line = JSON.stringify({ time, level, msg, logError: String(err) });
+    }
+    write(line);
   };
 
   return {
@@ -42,33 +50,31 @@ export const silentLogger: Logger = {
   child: () => silentLogger,
 };
 
-// A log call must never throw, so BigInts, cycles and Errors are handled here.
-function safeStringify(entry: LogFields): string {
-  const seen = new WeakSet<object>();
-  try {
-    return JSON.stringify(entry, (_key, value: unknown) => {
-      if (typeof value === "bigint") return value.toString();
-      if (value instanceof Error) return serializeError(value);
-      if (value !== null && typeof value === "object") {
-        if (seen.has(value)) return "[seen]";
-        seen.add(value);
-      }
-      return value;
-    });
-  } catch (err) {
-    return JSON.stringify({
-      time: entry.time,
-      level: entry.level,
-      msg: entry.msg,
-      logError: String(err),
-    });
-  }
-}
+/**
+ * A JSON-safe copy: BigInts become strings, Errors keep name, message, stack,
+ * own fields (LlmError.kind, ConfigError.issues) and their cause chain.
+ * Only true cycles (an object inside itself) become "[circular]"; the same
+ * object logged twice side by side is printed twice.
+ */
+function toJsonSafe(value: unknown, ancestors: object[]): unknown {
+  if (typeof value === "bigint") return value.toString();
+  if (value === null || typeof value !== "object") return value;
+  if (ancestors.includes(value)) return "[circular]";
+  if (ancestors.length > 20) return "[too deep]";
+  const path = [...ancestors, value];
 
-// Errors stringify to {} by default. Keep name/message/stack, own fields
-// (LlmError.kind, ConfigError.issues) and the cause chain.
-function serializeError(err: Error): LogFields {
-  const out: LogFields = { ...err, name: err.name, message: err.message, stack: err.stack };
-  if (err.cause !== undefined) out.cause = err.cause;
+  if (value instanceof Error) {
+    const out: LogFields = {};
+    for (const [k, v] of Object.entries(value)) out[k] = toJsonSafe(v, path);
+    out.name = value.name;
+    out.message = value.message;
+    out.stack = value.stack;
+    if (value.cause !== undefined) out.cause = toJsonSafe(value.cause, path);
+    return out;
+  }
+  if (Array.isArray(value)) return value.map((v) => toJsonSafe(v, path));
+  if (typeof (value as { toJSON?: unknown }).toJSON === "function") return value; // Date, URL…
+  const out: LogFields = {};
+  for (const [k, v] of Object.entries(value)) out[k] = toJsonSafe(v, path);
   return out;
 }
