@@ -33,9 +33,9 @@ export function parseCoordinates(text: string): Coordinates | null {
     return null;
   }
   // Google: /maps/place/.../@40.8,-73.9,17z and !3d40.8!4d-73.9 data segments.
-  const pinned = new RegExp(String.raw`!3d(${NUM})!4d(${NUM})`).exec(url.pathname);
+  const pinned = new RegExp(`!3d(${NUM})!4d(${NUM})`).exec(url.pathname);
   if (pinned) return checked(pinned[1], pinned[2]);
-  const at = new RegExp(String.raw`/@(${NUM}),(${NUM})`).exec(url.pathname);
+  const at = new RegExp(`/@(${NUM}),(${NUM})`).exec(url.pathname);
   if (at) return checked(at[1], at[2]);
   // Google ?q= / ?query= / ?ll=, Apple ?ll= / ?q= / ?sll=.
   for (const key of ["q", "query", "ll", "sll", "daddr"]) {

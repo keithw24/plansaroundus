@@ -26,6 +26,15 @@ const Env = z.object({
     "8787",
   ),
 
+  /** How long to wait for follow-up messages before answering ("dinner" … "near columbia"). */
+  INBOX_BATCH_MS: withDefault(
+    z
+      .string()
+      .regex(/^\d+$/, "must be a whole number")
+      .transform(Number)
+      .pipe(z.number().int().max(30_000)),
+    "2000",
+  ),
   CHAT_PROVIDER: withDefault(z.enum(["terminal", "photon"]), "terminal"),
   PHOTON_PROJECT_ID: optional(z.string()),
   PHOTON_API_KEY: optional(z.string()),
@@ -71,6 +80,7 @@ export type Config = {
   env: "development" | "test" | "production";
   logLevel: LogLevel;
   port: number;
+  inboxBatchMs: number;
   chat: { provider: "terminal" } | { provider: "photon"; projectId: string; apiKey: string };
   gemini: { apiKey: string; model: string } | null;
   mapsKey: string | null;
@@ -150,6 +160,7 @@ export function loadConfig(raw: Record<string, string | undefined>): Config {
     env: env.NODE_ENV,
     logLevel: env.LOG_LEVEL,
     port: env.PORT,
+    inboxBatchMs: env.INBOX_BATCH_MS,
     chat,
     gemini: env.GEMINI_API_KEY ? { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL } : null,
     mapsKey: env.GOOGLE_MAPS_API_KEY ?? null,

@@ -145,6 +145,8 @@ TurnHandler
 
 **Done when:** in the terminal, pasting a location then "hi" returns a canned help reply, and a question with no location returns "Where are you?"
 
+**Running it:** `npm start -w @aroundus/agent` (reads `.env` if present). No keys are needed. In the terminal, `/group on|off` and `/sender <phone or email>` exercise the group-chat and beta-flag paths. With `DATABASE_URL` set, run `npm run migrate -w @aroundus/agent` first; without it, chat memory is in-process. `INBOX_BATCH_MS` sets the batching window.
+
 ## 6. Phase 3: Gemini intent parser (`router/intent.ts`)
 
 It turns one message plus recent lines into a strict `UserIntent`:
