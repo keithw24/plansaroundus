@@ -2,10 +2,15 @@ import type { Logger } from "@aroundus/core";
 import type { InboundMessage } from "./channel.ts";
 
 /**
- * Batches messages per chat, because people send "dinner" then "near columbia".
- * A batch is answered `delayMs` after its last message, or `maxWaitMs` after its
- * first, whichever is sooner. Batches for one chat are handled one at a time,
- * in order; different chats run independently.
+ * Batches messages because people send "dinner" then "near columbia".
+ *
+ * - A batch is answered `delayMs` after its last message, or `maxWaitMs` after
+ *   its first, whichever is sooner. A pin with no text yet waits the full
+ *   `maxWaitMs` for the question that usually follows it.
+ * - In group chats each sender gets their own batch, so one person's words
+ *   (and flags, and sign-in code) are never attributed to another.
+ * - One chat answers one batch at a time, in order. Messages that arrive while
+ *   a turn is running wait and go into the next batch.
  */
 export function createInbox(opts: {
   delayMs: number;
@@ -14,44 +19,92 @@ export function createInbox(opts: {
   log: Logger;
 }) {
   const maxWaitMs = opts.maxWaitMs ?? opts.delayMs * 3;
-  type Pending = { messages: InboundMessage[]; timer: NodeJS.Timeout; firstAt: number };
-  const pending = new Map<string, Pending>();
+  type Batch = {
+    spaceId: string;
+    messages: InboundMessage[];
+    firstAt: number;
+    timer: NodeJS.Timeout | undefined;
+    /** Its wait is over; it runs as soon as the chat is free. */
+    due: boolean;
+  };
+  const pending = new Map<string, Batch>();
   const running = new Map<string, Promise<void>>();
+  let closed = false;
 
-  const flush = (spaceId: string) => {
-    const batch = pending.get(spaceId);
-    if (!batch) return;
-    clearTimeout(batch.timer);
-    pending.delete(spaceId);
+  const start = (key: string, batch: Batch) => {
+    pending.delete(key);
     const message = merge(batch.messages);
-
-    const previous = running.get(spaceId) ?? Promise.resolve();
-    const next = previous
-      .then(() => opts.onBatch(message))
+    const run = opts
+      .onBatch(message)
       .catch((err: unknown) => opts.log.error("batch failed", { err }))
       .finally(() => {
-        if (running.get(spaceId) === next) running.delete(spaceId);
+        running.delete(batch.spaceId);
+        startNextDue(batch.spaceId);
       });
-    running.set(spaceId, next);
+    running.set(batch.spaceId, run);
+  };
+
+  const startNextDue = (spaceId: string) => {
+    if (running.has(spaceId)) return;
+    for (const [key, batch] of pending) {
+      if (batch.spaceId === spaceId && batch.due) return start(key, batch);
+    }
+  };
+
+  const markDue = (key: string) => {
+    const batch = pending.get(key);
+    if (!batch) return;
+    clearTimeout(batch.timer);
+    batch.due = true;
+    startNextDue(batch.spaceId);
   };
 
   return {
     push(message: InboundMessage) {
+      if (closed) return;
+      const key = batchKey(message);
       const now = Date.now();
-      const existing = pending.get(message.spaceId);
-      if (existing) clearTimeout(existing.timer);
-      const batch = existing ?? { messages: [], timer: undefined as never, firstAt: now };
+      let batch = pending.get(key);
+      if (!batch) {
+        batch = {
+          spaceId: message.spaceId,
+          messages: [],
+          firstAt: now,
+          timer: undefined,
+          due: false,
+        };
+        pending.set(key, batch);
+      }
       batch.messages.push(message);
-      const wait = Math.max(0, Math.min(opts.delayMs, batch.firstAt + maxWaitMs - now));
-      batch.timer = setTimeout(() => flush(message.spaceId), wait);
-      pending.set(message.spaceId, batch);
+      // A due batch is only waiting for its chat to be free; it just grows.
+      if (batch.due) return;
+
+      clearTimeout(batch.timer);
+      const hasText = batch.messages.some((m) => m.text.trim());
+      const untilMax = batch.firstAt + maxWaitMs - now;
+      const wait = Math.max(0, hasText ? Math.min(opts.delayMs, untilMax) : untilMax);
+      batch.timer = setTimeout(() => markDue(key), wait);
     },
-    /** Answers everything pending now and waits for all turns to finish. */
+
+    /** Stops taking messages. Pending batches still run on drain(). */
+    close() {
+      closed = true;
+    },
+
+    /** Answers everything pending now and waits until every chat is idle. */
     async drain() {
-      for (const spaceId of [...pending.keys()]) flush(spaceId);
-      await Promise.all(running.values());
+      while (pending.size > 0 || running.size > 0) {
+        for (const key of [...pending.keys()]) markDue(key);
+        await Promise.all(running.values());
+      }
     },
   };
+}
+
+function batchKey(message: InboundMessage): string {
+  return message.isGroup
+    ? `${message.spaceId}\u0000${message.senderAddress ?? ""}`
+    : message.spaceId;
 }
 
 /** Texts joined by newlines; the latest location and sender win. */

@@ -1,3 +1,4 @@
+import { silentLogger } from "@aroundus/core";
 import { describe, expect, it } from "vitest";
 import {
   type ContextStore,
@@ -45,8 +46,8 @@ const testDb = process.env.TEST_DATABASE_URL;
 if (testDb) {
   contract("pg context store", async () => {
     await migrate(testDb, () => {});
-    const db = createPgQuery(testDb);
-    return { store: createPgContextStore(db.query), done: db.close };
+    const db = createPgQuery(testDb, silentLogger);
+    return { store: createPgContextStore(db.query, "k".repeat(32)), done: db.close };
   });
 } else {
   describe.skip("pg context store (set TEST_DATABASE_URL to run)", () => {
@@ -55,9 +56,10 @@ if (testDb) {
 }
 
 describe("chatKey", () => {
-  it("hashes chat ids so phone numbers are never stored", () => {
-    const key = chatKey("iMessage;-;+19175550142");
+  it("keys chat ids with a secret so phone numbers can't be recovered", () => {
+    const key = chatKey("a".repeat(32), "iMessage;-;+19175550142");
     expect(key).toMatch(/^[0-9a-f]{64}$/);
     expect(key).not.toContain("9175550142");
+    expect(chatKey("b".repeat(32), "iMessage;-;+19175550142")).not.toBe(key);
   });
 });

@@ -64,6 +64,11 @@ describe("flags", () => {
     expect(flags.forSender(null).enabled("skill.food")).toBe(true);
   });
 
+  it("beta senders can be Apple ID emails", () => {
+    const flags = flagsFrom({ FLAGS_BETA: "chat.groups", FLAGS_BETA_PHONES: "Keith@iCloud.com" });
+    expect(flags.enabled("chat.groups", { sender: "keith@icloud.com" })).toBe(true);
+  });
+
   it("an unparseable sender is simply not a beta sender", () => {
     const flags = flagsFrom({ FLAGS_BETA: "chat.groups", FLAGS_BETA_PHONES: "+19175550142" });
     expect(flags.enabled("chat.groups", { sender: "" })).toBe(false);

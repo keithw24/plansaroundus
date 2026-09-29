@@ -5,17 +5,19 @@ import {
   describeMissing,
   loadConfig,
 } from "@aroundus/core";
+import { createAgent } from "./agent.ts";
 import type { ChannelAdapter } from "./channel.ts";
 import {
   type ContextStore,
   createMemoryContextStore,
   createPgContextStore,
 } from "./context-store.ts";
-import { createInbox } from "./inbox.ts";
 import { createPgQuery } from "./pg.ts";
 import { cannedTurn } from "./replies.ts";
 import { createTerminalAdapter } from "./terminal.ts";
-import { createTurnHandler } from "./turn-handler.ts";
+
+// Docker gives 10 s between SIGTERM and SIGKILL; leave room to close the database.
+const SHUTDOWN_DEADLINE_MS = 8_000;
 
 let config: ReturnType<typeof loadConfig>;
 try {
@@ -36,9 +38,9 @@ const flags = createFlags(config.flags);
 
 let store: ContextStore;
 let closeDb = async () => {};
-if (config.databaseUrl) {
-  const db = createPgQuery(config.databaseUrl);
-  store = createPgContextStore(db.query);
+if (config.databaseUrl && config.chatKeySecret) {
+  const db = createPgQuery(config.databaseUrl, log);
+  store = createPgContextStore(db.query, config.chatKeySecret);
   closeDb = db.close;
 } else {
   log.warn("no DATABASE_URL: chat memory is in-process and lost on restart");
@@ -53,18 +55,26 @@ if (config.chat.provider === "photon") {
   channel = createTerminalAdapter();
 }
 
-const handle = createTurnHandler({ channel, store, flags, runTurn: cannedTurn, log });
-const inbox = createInbox({ delayMs: config.inboxBatchMs, onBatch: handle, log });
+const agent = createAgent({
+  channel,
+  store,
+  flags,
+  runTurn: cannedTurn,
+  log,
+  inboxBatchMs: config.inboxBatchMs,
+});
 
 let stopping = false;
 async function shutdown(reason: string) {
-  if (stopping) return;
+  if (stopping) {
+    log.warn("second signal: exiting now");
+    process.exit(1);
+  }
   stopping = true;
   log.info("shutting down", { reason });
-  await channel.stop();
-  await inbox.drain();
-  await closeDb();
-  process.exit(0);
+  const drained = await agent.shutdown(SHUTDOWN_DEADLINE_MS);
+  await closeDb().catch((err: unknown) => log.warn("could not close database", { err }));
+  process.exit(drained ? 0 : 1);
 }
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
@@ -72,5 +82,5 @@ process.on("SIGTERM", () => void shutdown("SIGTERM"));
 if (config.chat.provider === "terminal")
   process.stdin.on("end", () => void shutdown("stdin closed"));
 
-await channel.start((message) => inbox.push(message));
+await agent.start();
 log.info("agent started", { chat: config.chat.provider, flags: flags.effective() });

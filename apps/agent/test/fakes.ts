@@ -3,13 +3,11 @@ import type { ChannelAdapter, InboundMessage } from "../src/channel.ts";
 export function fakeChannel() {
   const sent: { spaceId: string; text: string }[] = [];
   let onMessage: ((m: InboundMessage) => void) | undefined;
-  const channel: ChannelAdapter & { failSends: boolean } = {
-    failSends: false,
+  const channel: ChannelAdapter = {
     async start(cb) {
       onMessage = cb;
     },
     async send(spaceId, text) {
-      if (channel.failSends) throw new Error("send failed");
       sent.push({ spaceId, text });
     },
     async sendTo(phone, text) {

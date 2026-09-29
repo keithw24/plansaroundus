@@ -1,5 +1,5 @@
 -- Per-chat memory: the last shared location and the last few lines.
--- Keyed by a hash of the chat id so no phone number is ever stored.
+-- Keyed by an HMAC of the chat id (CHAT_KEY_SECRET) so no phone number is ever stored.
 create schema if not exists app;
 
 create table if not exists app.chat_context (

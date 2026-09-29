@@ -187,39 +187,73 @@ const GEMINI_KEYWORDS = new Set([
  * Rewrites zod's JSON Schema into the subset Gemini supports. Dropped keywords
  * (pattern, minLength, $schema...) only loosen what the model is told; zod
  * still validates the reply in full.
+ *
+ * Every $ref is inlined, because Gemini forbids other keys (like a
+ * `.describe()` description) next to a $ref. Recursive schemas can't be
+ * inlined and throw, which `llm.json` reports as `invalid_request`.
  */
-export function toGeminiSchema(node: unknown): unknown {
-  if (Array.isArray(node)) return node.map(toGeminiSchema);
-  if (node === null || typeof node !== "object") return node;
+export function toGeminiSchema(root: unknown): unknown {
+  const defs = isRecord(root) && isRecord(root.$defs) ? root.$defs : {};
 
-  const src = node as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(src)) {
-    if (key === "const") {
-      // A literal like kind: "event". Gemini only understands it as a one-value enum.
-      if (typeof value === "string" || typeof value === "number") out.enum = [value];
-    } else if (
-      key === "exclusiveMinimum" &&
-      typeof value === "number" &&
-      src.minimum === undefined
-    ) {
-      out.minimum = value;
-    } else if (
-      key === "exclusiveMaximum" &&
-      typeof value === "number" &&
-      src.maximum === undefined
-    ) {
-      out.maximum = value;
-    } else if (key === "properties" || key === "$defs") {
-      // Keys here are property names, not keywords.
-      out[key] = Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, toGeminiSchema(v)]),
-      );
-    } else if (GEMINI_KEYWORDS.has(key)) {
-      out[key] = toGeminiSchema(value);
+  const convert = (node: unknown, refStack: string[]): unknown => {
+    if (Array.isArray(node)) return node.map((n) => convert(n, refStack));
+    if (!isRecord(node)) return node;
+
+    if (typeof node.$ref === "string") {
+      const ref = node.$ref;
+      const name = ref.startsWith("#/$defs/") ? ref.slice("#/$defs/".length) : null;
+      if (name === null || !(name in defs) || refStack.includes(ref)) {
+        throw new Error(`recursive or unresolvable schema reference ${ref}`);
+      }
+      const { $ref: _ref, ...siblings } = node;
+      // Siblings (usually a description) override the shared definition's.
+      return convert({ ...(defs[name] as object), ...siblings }, [...refStack, ref]);
     }
-  }
-  return out;
+
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "const") {
+        // A literal like kind: "event". Gemini only understands it as a one-value enum.
+        if (typeof value === "string" || typeof value === "number") out.enum = [value];
+      } else if (key === "enum") {
+        // Gemini supports enums of strings and numbers only.
+        if (
+          Array.isArray(value) &&
+          value.every((v) => typeof v === "string" || typeof v === "number")
+        ) {
+          out.enum = value;
+        }
+      } else if (key === "type" && Array.isArray(value)) {
+        // ["string", "null"] → anyOf, the form Gemini documents.
+        out.anyOf = value.map((t) => ({ type: t }));
+      } else if (key === "items" && !isRecord(value)) {
+        // `items: false` after prefixItems (tuples) has no Gemini equivalent.
+      } else if (
+        (key === "exclusiveMinimum" || key === "exclusiveMaximum") &&
+        typeof value === "number"
+      ) {
+        const bound = key === "exclusiveMinimum" ? "minimum" : "maximum";
+        if (node[bound] === undefined) out[bound] = value;
+      } else if (key === "properties") {
+        // Keys here are property names, not keywords.
+        out.properties = Object.fromEntries(
+          Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+            k,
+            convert(v, refStack),
+          ]),
+        );
+      } else if (key !== "$defs" && GEMINI_KEYWORDS.has(key)) {
+        out[key] = convert(value, refStack);
+      }
+    }
+    return out;
+  };
+
+  return convert(root, []);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function deepFreeze<T>(value: T): T {

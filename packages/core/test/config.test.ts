@@ -48,6 +48,7 @@ describe("loadConfig", () => {
       GEMINI_API_KEY: "g",
       GOOGLE_MAPS_API_KEY: "m",
       DATABASE_URL: "postgres://u:p@host:5432/db",
+      CHAT_KEY_SECRET: "k".repeat(32),
       RESEND_API_KEY: "r",
       RESEND_FROM: "Around Us <hi@example.com>",
       SITE_AUTH_SECRET: "x".repeat(32),
@@ -76,8 +77,19 @@ describe("loadConfig", () => {
       PHOTON_PROJECT_ID: "p",
       PHOTON_API_KEY: "k",
       DATABASE_URL: "postgresql://localhost/db",
+      CHAT_KEY_SECRET: "k".repeat(32),
     });
     expect(config.chat).toEqual({ provider: "photon", projectId: "p", apiKey: "k" });
+  });
+
+  it("requires a chat key secret whenever there's a database", () => {
+    expect(issuesOf({ DATABASE_URL: "postgres://localhost/db" })).toEqual([
+      "CHAT_KEY_SECRET: required when DATABASE_URL is set",
+    ]);
+  });
+
+  it("rejects origins with a stray ? or #", () => {
+    expect(issuesOf({ SITE_ORIGINS: "https://a.com/?,https://b.com#" })).toHaveLength(2);
   });
 
   it("fails on unknown flags", () => {
@@ -93,7 +105,8 @@ describe("loadConfig", () => {
       DATABASE_URL: "mysql://nope",
       SITE_AUTH_SECRET: "short",
     });
-    expect(issues).toHaveLength(4);
+    // The four bad values, plus CHAT_KEY_SECRET now that a DATABASE_URL is given.
+    expect(issues).toHaveLength(5);
   });
 
   it("reports schema errors and cross-field errors together", () => {

@@ -16,6 +16,27 @@ export function parseTerminalLine(line: string): { text: string; location?: Loca
   return { text };
 }
 
+type Command =
+  | { kind: "group"; on: boolean }
+  | { kind: "sender"; sender: string | undefined }
+  | { kind: "usage"; message: string };
+
+const USAGE = "· commands: /group on|off, /sender <phone or email> (blank clears it)";
+
+/** "/group on", "/sender +1917…". Null if the line isn't a command. */
+export function parseCommand(line: string): Command | null {
+  const match = /^\/(\w+)(?:\s+(.*))?$/.exec(line.trim());
+  if (!match) return null;
+  const [, name, arg = ""] = match;
+  if (name === "group") {
+    const value = arg.trim().toLowerCase();
+    if (value === "on" || value === "off") return { kind: "group", on: value === "on" };
+    return { kind: "usage", message: USAGE };
+  }
+  if (name === "sender") return { kind: "sender", sender: arg.trim() || undefined };
+  return { kind: "usage", message: USAGE };
+}
+
 /**
  * The dev loop: stdin in, stdout out. `/group on|off` and `/sender <address>`
  * let you exercise group-chat and beta-flag paths without a phone.
@@ -35,10 +56,11 @@ export function createTerminalAdapter(
     async start(onMessage) {
       rl = createInterface({ input: io.input, terminal: false });
       rl.on("line", (line) => {
-        const command = /^\/(group|sender)\s*(.*)$/.exec(line.trim());
+        const command = parseCommand(line);
         if (command) {
-          if (command[1] === "group") isGroup = command[2] === "on";
-          else senderAddress = command[2] || undefined;
+          if (command.kind === "group") isGroup = command.on;
+          else if (command.kind === "sender") senderAddress = command.sender;
+          else print(command.message);
           print(`· group=${isGroup ? "on" : "off"} sender=${senderAddress ?? "none"}`);
           return;
         }

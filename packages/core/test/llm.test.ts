@@ -185,6 +185,42 @@ describe("toGeminiSchema", () => {
     });
   });
 
+  it("inlines refs so a description on a reused schema survives", () => {
+    const Place = z.object({ name: z.string() }).meta({ id: "TestPlace" });
+    const json = jsonSchemaFor(z.object({ from: Place.describe("where they start"), to: Place }));
+    expect(JSON.stringify(json)).not.toContain("$ref");
+    expect(json).toMatchObject({
+      properties: {
+        from: { type: "object", description: "where they start" },
+        to: { type: "object", properties: { name: { type: "string" } } },
+      },
+    });
+  });
+
+  it("rewrites nullable, tuples and non-string enums into forms Gemini accepts", () => {
+    const json = jsonSchemaFor(
+      z.object({
+        maybe: z.string().nullable(),
+        pair: z.tuple([z.string(), z.number()]),
+        mixed: z.literal([1, true, "x"]),
+      }),
+    ) as { properties: Record<string, Record<string, unknown>> };
+    expect(json.properties.maybe).toEqual({ anyOf: [{ type: "string" }, { type: "null" }] });
+    expect(json.properties.pair).not.toHaveProperty("items");
+    expect(json.properties.mixed).not.toHaveProperty("enum");
+  });
+
+  it("refuses recursive schemas as invalid_request", async () => {
+    type Tree = { kids: Tree[] };
+    const Tree: z.ZodType<Tree> = z.lazy(() => z.object({ kids: z.array(Tree) }));
+    const generate = vi.fn<Generate>(async () => "{}");
+    const llm = createLlm(generate);
+    expect(await kindOf(llm.json({ ...base, schema: z.object({ tree: Tree }) }))).toBe(
+      "invalid_request",
+    );
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it("returns a frozen, cached object", () => {
     const a = jsonSchemaFor(z.object({ x: z.string() }));
     expect(Object.isFrozen(a)).toBe(true);

@@ -29,7 +29,37 @@ describe("logger", () => {
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
     expect(() => log.info("odd", { big: 10n, cyclic })).not.toThrow();
-    expect(lines[0]).toMatchObject({ big: "10", cyclic: { self: "[seen]" } });
+    expect(lines[0]).toMatchObject({ big: "10", cyclic: { self: "[circular]" } });
+  });
+
+  it("prints the same object twice when it isn't a cycle", () => {
+    const { log, lines } = capture();
+    const loc = { lat: 40.8 };
+    log.info("route", { origin: loc, dest: loc });
+    expect(lines[0]).toMatchObject({ origin: { lat: 40.8 }, dest: { lat: 40.8 } });
+  });
+
+  it("keeps the entry when errors' causes form a cycle", () => {
+    const { log, lines } = capture();
+    const a = new Error("a");
+    const b = new Error("b", { cause: a });
+    a.cause = b;
+    log.error("loop", { err: a, skill: "food" });
+    expect(lines[0]).toMatchObject({
+      skill: "food",
+      err: { message: "a", cause: { message: "b", cause: "[circular]" } },
+    });
+  });
+
+  it("survives a throwing getter in fields", () => {
+    const { log, lines } = capture();
+    const fields = {
+      get boom() {
+        throw new Error("getter");
+      },
+    };
+    expect(() => log.info("x", fields)).not.toThrow();
+    expect(lines[0]).toMatchObject({ level: "info", msg: "x" });
   });
 
   it("keeps error kind and cause", () => {

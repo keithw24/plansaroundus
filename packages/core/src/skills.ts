@@ -38,16 +38,21 @@ export const SafetyData = z.object({
   dataThrough: z.iso.date(),
 });
 
-export const EventsInput = z.object({
-  origin: Location,
-  from: Timestamp,
-  to: Timestamp,
-  radiusMeters: z.number().positive().default(2000),
-  categories: z.array(z.string()).default([]),
-  budget: Budget.optional(),
-  /** events.tavily flag, resolved per sender by the caller. Skills never read flags. */
-  webEnrichment: z.boolean().default(false),
-});
+export const EventsInput = z
+  .object({
+    origin: Location,
+    from: Timestamp,
+    to: Timestamp,
+    radiusMeters: z.number().positive().default(2000),
+    categories: z.array(z.string()).default([]),
+    budget: Budget.optional(),
+    /** events.tavily flag, resolved per sender. Required so the caller can't forget it. */
+    webEnrichment: z.boolean(),
+  })
+  .refine((e) => Date.parse(e.to) >= Date.parse(e.from), {
+    message: "to is before from",
+    path: ["to"],
+  });
 export const EventsData = z.object({ events: z.array(EventRecommendation).max(5) });
 
 export const FoodInput = z.object({
@@ -57,8 +62,8 @@ export const FoodInput = z.object({
   openNow: z.boolean().default(false),
   /** The user's original words, for the re-rank. */
   request: z.string(),
-  /** food.gemini_rank flag, resolved per sender by the caller. */
-  rerank: z.boolean().default(true),
+  /** food.gemini_rank flag, resolved per sender. Required so the caller can't forget it. */
+  rerank: z.boolean(),
 });
 export const FoodData = z.object({ places: z.array(FoodRecommendation).max(5) });
 

@@ -15,14 +15,18 @@ export function haversineMeters(a: Coordinates, b: Coordinates): number {
 
 const NUM = String.raw`[-+]?\d{1,3}(?:\.\d+)?`;
 const PAIR = new RegExp(String.raw`^\s*(${NUM})\s*,\s*(${NUM})\s*$`);
+// Typed text needs decimals in both numbers, so "10,000" or "3, 4" aren't a pin.
+const DECIMAL = String.raw`[-+]?\d{1,3}\.\d+`;
+const TYPED_PAIR = new RegExp(String.raw`^\s*(${DECIMAL})\s*,\s*(${DECIMAL})\s*$`);
 
 /**
- * Coordinates from a bare "40.8075,-73.9626" or a Google / Apple Maps link.
+ * Coordinates from a bare "40.8075,-73.9626" (both with decimals) or a
+ * Google / Apple Maps link.
  * Returns null for anything else, including out-of-range values.
  */
 export function parseCoordinates(text: string): Coordinates | null {
   const trimmed = text.trim();
-  const bare = PAIR.exec(trimmed);
+  const bare = TYPED_PAIR.exec(trimmed);
   if (bare) return checked(bare[1], bare[2]);
   if (!/^https?:\/\//i.test(trimmed)) return null;
 

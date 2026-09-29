@@ -1,7 +1,7 @@
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 import type { InboundMessage } from "../src/channel.ts";
-import { createTerminalAdapter, parseTerminalLine } from "../src/terminal.ts";
+import { createTerminalAdapter, parseCommand, parseTerminalLine } from "../src/terminal.ts";
 
 describe("parseTerminalLine", () => {
   it("treats pasted coordinates and Maps links as a shared location", () => {
@@ -12,6 +12,11 @@ describe("parseTerminalLine", () => {
     expect(parseTerminalLine("https://maps.google.com/?q=40.7,-73.9")?.location).toMatchObject({
       latitude: 40.7,
     });
+  });
+
+  it("doesn't mistake plain numbers for a location", () => {
+    expect(parseTerminalLine("2,3")).toEqual({ text: "2,3" });
+    expect(parseTerminalLine("10,000")).toEqual({ text: "10,000" });
   });
 
   it("treats anything else as text and skips blank lines", () => {
@@ -43,5 +48,22 @@ describe("terminal adapter", () => {
     ]);
     expect(printed).toContain("· group=on sender=+19175550142");
     expect(printed).toContain("agent> hey\n");
+  });
+});
+
+describe("parseCommand", () => {
+  it.each([
+    ["/group on", { kind: "group", on: true }],
+    ["/group OFF", { kind: "group", on: false }],
+    ["/sender +19175550142", { kind: "sender", sender: "+19175550142" }],
+    ["/sender", { kind: "sender", sender: undefined }],
+  ])("%s", (line, expected) => {
+    expect(parseCommand(line)).toEqual(expected);
+  });
+
+  it("shows usage for bad or unknown commands instead of guessing", () => {
+    expect(parseCommand("/group yes")?.kind).toBe("usage");
+    expect(parseCommand("/groupies")?.kind).toBe("usage");
+    expect(parseCommand("hi /group on")).toBeNull();
   });
 });
