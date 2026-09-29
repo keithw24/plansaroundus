@@ -21,12 +21,8 @@ export function createLogger(
 
   const log = (level: LogLevel) => (msg: string, fields?: LogFields) => {
     if (LOG_LEVELS.indexOf(level) < min) return;
-    write(
-      JSON.stringify(
-        { time: new Date().toISOString(), level, msg, ...base, ...fields },
-        errorReplacer,
-      ),
-    );
+    // time/level/msg go last so fields can't overwrite them.
+    write(safeStringify({ ...base, ...fields, time: new Date().toISOString(), level, msg }));
   };
 
   return {
@@ -46,9 +42,33 @@ export const silentLogger: Logger = {
   child: () => silentLogger,
 };
 
-// Errors stringify to {} by default; keep the useful parts.
-function errorReplacer(_key: string, value: unknown): unknown {
-  if (value instanceof Error)
-    return { name: value.name, message: value.message, stack: value.stack };
-  return value;
+// A log call must never throw, so BigInts, cycles and Errors are handled here.
+function safeStringify(entry: LogFields): string {
+  const seen = new WeakSet<object>();
+  try {
+    return JSON.stringify(entry, (_key, value: unknown) => {
+      if (typeof value === "bigint") return value.toString();
+      if (value instanceof Error) return serializeError(value);
+      if (value !== null && typeof value === "object") {
+        if (seen.has(value)) return "[seen]";
+        seen.add(value);
+      }
+      return value;
+    });
+  } catch (err) {
+    return JSON.stringify({
+      time: entry.time,
+      level: entry.level,
+      msg: entry.msg,
+      logError: String(err),
+    });
+  }
+}
+
+// Errors stringify to {} by default. Keep name/message/stack, own fields
+// (LlmError.kind, ConfigError.issues) and the cause chain.
+function serializeError(err: Error): LogFields {
+  const out: LogFields = { ...err, name: err.name, message: err.message, stack: err.stack };
+  if (err.cause !== undefined) out.cause = err.cause;
+  return out;
 }

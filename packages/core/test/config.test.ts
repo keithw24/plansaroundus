@@ -18,8 +18,22 @@ describe("loadConfig", () => {
     expect(config.port).toBe(8787);
     expect(config.gemini).toBeNull();
     expect(config.mapsKey).toBeNull();
-    expect(config.missing).toContain("GOOGLE_MAPS_API_KEY");
-    expect(describeMissing(config)).toMatch(/^Running without: .*GEMINI_API_KEY/);
+    expect(config.missing).toEqual([
+      "GEMINI_API_KEY",
+      "GOOGLE_MAPS_API_KEY",
+      "DATABASE_URL",
+      "RESEND_API_KEY",
+      "SITE_AUTH_SECRET",
+    ]);
+    expect(describeMissing(config)).toBe(
+      "Running without: GEMINI_API_KEY, GOOGLE_MAPS_API_KEY, DATABASE_URL, RESEND_API_KEY, SITE_AUTH_SECRET",
+    );
+    expect(config.skillsMissing).toEqual({
+      safety: ["DATABASE_URL"],
+      events: ["DATABASE_URL"],
+      food: ["GOOGLE_MAPS_API_KEY"],
+      route: [],
+    });
   });
 
   it("treats blank values as unset", () => {
@@ -45,6 +59,7 @@ describe("loadConfig", () => {
     expect(config.port).toBe(9000);
     expect(config.missing).toEqual([]);
     expect(describeMissing(config)).toBeNull();
+    expect(Object.values(config.skillsMissing).flat()).toEqual([]);
   });
 
   it("refuses to start photon half-configured", () => {
@@ -81,8 +96,37 @@ describe("loadConfig", () => {
     expect(issues).toHaveLength(4);
   });
 
-  it("rejects origins with a path and Resend without a sender", () => {
-    const issues = issuesOf({ SITE_ORIGINS: "https://aroundus.nyc/", RESEND_API_KEY: "r" });
-    expect(issues).toHaveLength(2);
+  it("reports schema errors and cross-field errors together", () => {
+    expect(issuesOf({ PORT: "99999", FLAGS_OFF: "skill.fod" })).toHaveLength(2);
+    expect(issuesOf({ CHAT_PROVIDER: "photon", SITE_AUTH_SECRET: "short" })).toHaveLength(4);
+  });
+
+  it("accepts only plain whole-number ports", () => {
+    for (const PORT of ["0x1F90", "1e3", "8080.0", "-1", "0"]) {
+      expect(issuesOf({ PORT })).toHaveLength(1);
+    }
+    expect(loadConfig({ PORT: " 8080 " }).port).toBe(8080);
+  });
+
+  it("trims every value", () => {
+    const config = loadConfig({
+      NODE_ENV: " production ",
+      GEMINI_API_KEY: "g",
+      GEMINI_MODEL: " m ",
+    });
+    expect(config.env).toBe("production");
+    expect(config.gemini?.model).toBe("m");
+  });
+
+  it("normalizes origins and rejects ones with a path", () => {
+    const config = loadConfig({ SITE_ORIGINS: "https://AroundUs.nyc/,https://x.com:443" });
+    expect(config.site.origins).toEqual(["https://aroundus.nyc", "https://x.com"]);
+    expect(issuesOf({ SITE_ORIGINS: "https://aroundus.nyc/signup" })).toHaveLength(1);
+  });
+
+  it("rejects Resend without a sender", () => {
+    expect(issuesOf({ RESEND_API_KEY: "r" })).toEqual([
+      "RESEND_FROM: required when RESEND_API_KEY is set",
+    ]);
   });
 });

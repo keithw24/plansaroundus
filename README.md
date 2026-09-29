@@ -69,7 +69,7 @@ around-me/
 └── .env.example
 ```
 
-**Dependency rule:** skills import only `@core` and `zod`. The router imports skills only through the registry type. Only `apps/` read `process.env`. A test enforces this, so parallel work on skills can't tangle.
+**Dependency rule:** skills import only `@aroundus/core` and `zod`. The router imports skills only through the registry type. Only `apps/` read `process.env`. A test enforces this, so parallel work on skills can't tangle.
 
 ## 4. Phase 1: core contracts (`packages/core`)
 
@@ -78,12 +78,12 @@ Build this first. Everything else codes against it.
 ```ts
 type Location = { label: string; latitude: number; longitude: number };
 
-type SkillResult<T> = {
-  status: "ok" | "partial" | "unavailable";
-  data: T;
-  sources: { name: string; url?: string; updatedAt?: string }[];
-  warnings: string[];
-};
+// `unavailable` carries no data, only a reason code the reply turns into
+// "couldn't reach X" or "X is turned off right now".
+type SkillResult<T> =
+  | { status: "ok" | "partial"; data: T; sources: Source[]; warnings: string[] }
+  | { status: "unavailable"; data: null; reason: "off" | "not_configured" | "invalid_input" | "timeout" | "error";
+      detail?: string; sources: Source[]; warnings: string[] };
 
 interface Skill<I, O> {
   name: "safety" | "food" | "events" | "route";
@@ -93,11 +93,13 @@ interface Skill<I, O> {
 }
 
 // Anything the reply can recommend. `id` is the only handle Gemini may cite.
-interface Recommendation {
-  id: string; kind: "event" | "food"; name: string; location: Location;
-  distanceMeters: number; startsAt?: string; endsAt?: string; priceLevel?: string;
-  openNow?: boolean; categories: string[]; url?: string; source: Source;
-}
+// Events require `startsAt`; food requires `placeId`. Links are http(s) only.
+type Recommendation = EventRecommendation | FoodRecommendation;
+```
+
+Each skill's input and output schema also lives in core (`skills.ts`, `SKILL_IO`), with a `SkillRegistry` type tying each name to its own types, so the router and the four skill packages build against the same shapes.
+
+```ts
 ```
 
 Also in core:
@@ -111,6 +113,9 @@ Also in core:
 | `time.ts` | "tonight" / "at 9pm" / "tomorrow evening" → an hour and a from/to window in America/New_York. |
 | `geo.ts` | Haversine distance, parsing `lat,lng` and Maps links into coordinates. |
 | `places.ts` | A geocoder: named place → `Location`, via Places Text Search. |
+| `db.ts` | The `Query` type. |
+| `phone.ts` | Phone and sender normalization (iMessage senders can be emails). |
+| `skills.ts` | Per-skill input/output schemas and the `SkillRegistry` type. |
 
 **Done when:** contracts compile, config tests pass, `llm.json` is tested against a fake.
 
@@ -294,10 +299,11 @@ FLAGS_BETA_PHONES=+19175550142,+13475550199
 | `FLAGS_ON` / `FLAGS_OFF` | Override the default for everyone |
 | `FLAGS_BETA` | On only for senders in `FLAGS_BETA_PHONES` (the team) |
 
-API, created once in `main.ts` and passed down like any other dependency:
+API, created once in `main.ts`. The turn handler resolves a per-sender view once per turn and passes it down, so beta flags work at every call site:
 
 ```ts
-flags.enabled("chat.groups", { phone: senderAddress }) // → boolean
+flags.enabled("chat.groups", { sender: senderAddress }) // sender is required; null when there is none
+const turnFlags = flags.forSender(senderAddress)       // → { enabled(name) }
 ```
 
 **Rules:**
@@ -313,8 +319,8 @@ flags.enabled("chat.groups", { phone: senderAddress }) // → boolean
 | `skill.*` | `runSkill`, before running |
 | `intent.gemini` | `parseIntent`: off → `heuristicIntent` |
 | `compose.gemini` | compose node: off → `templateDraft` |
-| `food.gemini_rank` | food skill factory option, set from the flag in `main.ts` |
-| `events.tavily` | events skill factory option |
+| `food.gemini_rank` | graph, passed per call as `FoodInput.rerank` |
+| `events.tavily` | graph, passed per call as `EventsInput.webEnrichment` |
 | `chat.groups` | turn handler, before the mention check |
 | `site.signup` | `POST /api/auth/*` returns `signup_closed` |
 

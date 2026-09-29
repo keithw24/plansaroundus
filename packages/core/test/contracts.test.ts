@@ -58,15 +58,54 @@ describe("contracts", () => {
     ).toBe(false);
   });
 
+  it("rejects non-http links, blank names and events that end before they start", () => {
+    const event = {
+      id: "parks:1",
+      kind: "event",
+      name: "Concert",
+      location: columbia,
+      distanceMeters: 1,
+      startsAt: "2026-09-29T19:00:00-04:00",
+      categories: [],
+      source: parks,
+    };
+    expect(Recommendation.safeParse(event).success).toBe(true);
+    expect(Recommendation.safeParse({ ...event, url: "javascript:alert(1)" }).success).toBe(false);
+    expect(Recommendation.safeParse({ ...event, url: "file:///etc/passwd" }).success).toBe(false);
+    expect(Recommendation.safeParse({ ...event, name: "   " }).success).toBe(false);
+    expect(
+      Recommendation.safeParse({ ...event, endsAt: "2026-09-29T18:00:00-04:00" }).success,
+    ).toBe(false);
+  });
+
+  it("timestamps need an explicit offset", () => {
+    const at = (startsAt: string) =>
+      Recommendation.safeParse({
+        id: "e",
+        kind: "event",
+        name: "e",
+        location: columbia,
+        distanceMeters: 0,
+        startsAt,
+        categories: [],
+        source: parks,
+      }).success;
+    expect(at("2026-09-29T19:00:00Z")).toBe(true);
+    expect(at("2026-09-29T19:00:00")).toBe(false);
+    expect(at("2026-09-29")).toBe(false);
+  });
+
   it("unavailable results carry a reason and no data", () => {
-    const r: SkillResult<{ count: number }> = unavailable("couldn't reach safety");
+    const r: SkillResult<{ count: number }> = unavailable("timeout", "no reply in 4000 ms");
     expect(r).toEqual({
       status: "unavailable",
       data: null,
-      reason: "couldn't reach safety",
+      reason: "timeout",
+      detail: "no reply in 4000 ms",
       sources: [],
       warnings: [],
     });
+    expect(unavailable("off")).not.toHaveProperty("detail");
     if (r.status !== "unavailable") expectTypeOf(r.data).toEqualTypeOf<{ count: number }>();
   });
 
