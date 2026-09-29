@@ -1,0 +1,13 @@
+{
+  "name": "@aroundus/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^2.24.0",
+    "zod": "^4.6.5"
+  }
+}
