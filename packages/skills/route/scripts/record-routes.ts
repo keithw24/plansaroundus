@@ -58,15 +58,22 @@ if (placeId) {
 const recorded: RecordedCase[] = [];
 let failures = 0;
 for (const c of CASES) {
-  let body: string | undefined;
+  let exchange: Pick<RecordedCase, "request" | "httpStatus" | "responseText"> | undefined;
   const recording: typeof fetch = async (url, init) => {
+    // Saved before sending, so a review can check exactly what went to Google.
+    const headers = new Headers(init?.headers);
+    const request = {
+      fieldMask: headers.get("X-Goog-FieldMask") ?? "",
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+    };
     const res = await fetch(url, init);
-    body = await res.clone().text();
+    exchange = { request, httpStatus: res.status, responseText: await res.clone().text() };
     return res;
   };
+  const now = new Date();
   const skill = createRouteSkill({ mapsKey: config.mapsKey, fetch: recording });
   const result = await skill.run(c.input, {
-    now: new Date(),
+    now,
     signal: AbortSignal.timeout(skill.timeoutMs),
     log: createLogger({ level: "debug" }),
   });
@@ -77,12 +84,14 @@ for (const c of CASES) {
     result.data ? JSON.stringify({ ...result.data, directionsUrl: undefined }) : "",
     result.warnings.join(" "),
   );
-  if (ok && body !== undefined) {
+  // Failures are kept too: their request and Google's error are what a review needs.
+  if (exchange && result.status !== "unavailable") {
     recorded.push({
       name: c.name,
+      now: now.toISOString(),
       input: c.input,
-      response: JSON.parse(body),
-      expected: result.data,
+      ...exchange,
+      expected: { status: result.status, data: result.data, warnings: result.warnings },
     });
   }
 }

@@ -10,6 +10,8 @@ import {
   createRouteSkill,
   directionsUrl,
   durationMinutes,
+  LEAVING_NOW_WARNING,
+  MAPS_URL_MAX,
   ROUTE_TIMEOUT_MS,
   ROUTES_CALL_TIMEOUT_MS,
 } from "../src/index.ts";
@@ -128,14 +130,48 @@ describe("route skill with a key", () => {
     expect(walkOnly.data).not.toHaveProperty("summary");
   });
 
-  it("transit: a departure time in the past is sent as now", async () => {
+  it("transit: a past departure within 7 days is sent as asked, with no warning", async () => {
     const f = fakeFetch(R.TRANSIT_ONE_RIDE);
     const skill = createRouteSkill({ mapsKey: KEY, fetch: f.fetch });
-    await skill.run(
-      input({ travelMode: "TRANSIT", departureTime: "2026-09-29T20:00:00-04:00" }),
+    for (const departureTime of ["2026-09-29T20:00:00-04:00", "2026-09-23T21:30:00-04:00"]) {
+      const res = await skill.run(input({ travelMode: "TRANSIT", departureTime }), ctx());
+      expect(res.status).toBe("ok");
+      expect(res.warnings).toEqual([]);
+      expect(f.calls.at(-1)?.body.departureTime).toBe(new Date(departureTime).toISOString());
+    }
+  });
+
+  it("transit: a departure more than 7 days back is sent as now, with a warning", async () => {
+    const f = fakeFetch(R.TRANSIT_ONE_RIDE);
+    const skill = createRouteSkill({ mapsKey: KEY, fetch: f.fetch });
+    const res = await skill.run(
+      input({ travelMode: "TRANSIT", departureTime: "2026-09-22T20:00:00-04:00" }),
       ctx(),
     );
     expect(f.calls[0]?.body.departureTime).toBe(NOW.toISOString());
+    expect(res.status).toBe("ok");
+    expect(res.data?.durationMinutes).toBe(22);
+    expect(res.warnings).toEqual([LEAVING_NOW_WARNING]);
+    expect(LEAVING_NOW_WARNING).toMatch(/leaving now/);
+  });
+
+  it("transit: one malformed step drops only the summary", async () => {
+    const route = structuredClone(R.TRANSIT_TRANSFER.routes[0]);
+    const steps = route?.legs?.[0]?.steps as unknown[];
+    steps[1] = { travelMode: "TRANSIT", transitDetails: { transitLine: { nameShort: 42 } } };
+    const skill = createRouteSkill({ mapsKey: KEY, fetch: fakeFetch({ routes: [route] }).fetch });
+    const res = await skill.run(input({ travelMode: "TRANSIT" }), ctx());
+    expect(res.status).toBe("ok");
+    expect(res.data).toMatchObject({ durationMinutes: 35, distanceMeters: 9870 });
+    expect(res.data).not.toHaveProperty("summary");
+
+    const odd = createRouteSkill({
+      mapsKey: KEY,
+      fetch: fakeFetch({ routes: [{ duration: "600s", legs: "nonsense" }] }).fetch,
+    });
+    const res2 = await odd.run(input({ travelMode: "TRANSIT" }), ctx());
+    expect(res2.status).toBe("ok");
+    expect(res2.data?.durationMinutes).toBe(10);
   });
 
   it("drive: traffic-aware, a future departure is sent, a 'now' one is left out", async () => {
@@ -335,6 +371,72 @@ describe("directionsUrl", () => {
     const url = new URL(raw);
     expect(url.searchParams.get("destination")).toBe(label);
     expect(url.searchParams.get("destination_place_id")).toBe("ChIJ abc/+=");
+  });
+
+  it("a blank place id counts as absent; a padded one is trimmed", () => {
+    const blank = new URL(directionsUrl(input({ destination: { ...JIN, placeId: "  " } })));
+    expect(blank.searchParams.has("destination_place_id")).toBe(false);
+    expect(blank.searchParams.get("destination")).toBe("40.8146,-73.9586");
+
+    const padded = new URL(directionsUrl(input({ destination: { ...JIN, placeId: " ChIJ-x " } })));
+    expect(padded.searchParams.get("destination_place_id")).toBe("ChIJ-x");
+  });
+
+  it("stays within the Maps URL limit: long labels are cut, then dropped", () => {
+    const long = "Joe's ".repeat(400); // 2,400 characters
+    const cut = directionsUrl(input({ destination: { ...JIN, label: long, placeId: "ChIJ-x" } }));
+    expect(cut.length).toBeLessThanOrEqual(MAPS_URL_MAX);
+    const params = new URL(cut).searchParams;
+    expect(params.get("destination_place_id")).toBe("ChIJ-x");
+    expect(params.get("destination")?.length).toBeLessThanOrEqual(100);
+
+    // Labels never appear without a place id, so they can't push it over.
+    const noId = directionsUrl(input({ destination: { ...JIN, label: long } }));
+    expect(noId.length).toBeLessThan(200);
+
+    // An absurd place id is dropped too; the coordinates still route.
+    const hugeId = directionsUrl(
+      input({ destination: { ...JIN, label: long, placeId: "x".repeat(3000) } }),
+    );
+    expect(hugeId.length).toBeLessThanOrEqual(MAPS_URL_MAX);
+    expect(new URL(hugeId).searchParams.get("destination")).toBe("40.8146,-73.9586");
+  });
+
+  it("never writes coordinates in scientific notation", () => {
+    const url = directionsUrl(
+      input({
+        origin: { label: "a", latitude: 1e-7, longitude: -5e-8 },
+        destination: { label: "b", latitude: 0.0000051, longitude: -73.123456789 },
+      }),
+    );
+    const params = new URL(url).searchParams;
+    expect(params.get("origin")).toBe("0,0");
+    expect(params.get("destination")).toBe("0.000005,-73.123457");
+    expect(url).not.toMatch(/e-/);
+  });
+});
+
+describe("Routes request waypoints", () => {
+  it("rounds coordinates to 6 decimals and ignores a blank place id", async () => {
+    const f = fakeFetch(R.WALK);
+    const skill = createRouteSkill({ mapsKey: KEY, fetch: f.fetch });
+    await skill.run(
+      input({
+        origin: { label: "a", latitude: 1e-7, longitude: -73.123456789 },
+        destination: { ...JIN, placeId: "   " },
+      }),
+      ctx(),
+    );
+    expect(f.calls[0]?.body.origin).toEqual({
+      location: { latLng: { latitude: 0, longitude: -73.123457 } },
+    });
+    expect(f.calls[0]?.body.destination).toEqual({
+      location: { latLng: { latitude: 40.8146, longitude: -73.9586 } },
+    });
+    expect(String(f.calls[0]?.init.body)).not.toMatch(/e-/);
+
+    await skill.run(input({ destination: { ...JIN, placeId: " ChIJ-jin " } }), ctx());
+    expect(f.calls[1]?.body.destination).toEqual({ placeId: "ChIJ-jin" });
   });
 });
 

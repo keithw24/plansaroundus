@@ -19,7 +19,7 @@ import {
   transitSummary,
 } from "./routes-api.ts";
 
-export { directionsUrl } from "./maps-url.ts";
+export { directionsUrl, MAPS_URL_MAX } from "./maps-url.ts";
 export { durationMinutes, fieldMask, routesRequest, transitSummary } from "./routes-api.ts";
 
 /** The dispatcher's budget for the whole skill. */
@@ -36,6 +36,10 @@ export type RouteSkillOptions = {
 
 /** Why there's no travel time. Codes for logs; `warning` is the human version. */
 type FallbackReason = "not_configured" | "http" | "bad_response" | "no_route" | "timeout" | "error";
+
+/** On an `ok` transit result whose requested departure was too far back for Routes. */
+export const LEAVING_NOW_WARNING =
+  "Travel time is for leaving now: the requested departure is more than 7 days ago.";
 
 const WARNINGS: Record<FallbackReason, string> = {
   not_configured: "No travel time: Google Routes is not configured.",
@@ -77,8 +81,16 @@ export function createRouteSkill(opts: RouteSkillOptions): SkillRegistry["route"
         return fallback(input.travelMode, url, "not_configured");
       }
 
+      const request = routesRequest(input, ctx.now);
       try {
-        const route = await callRoutes(opts.mapsKey, input, ctx, doFetch, routesTimeoutMs);
+        const route = await callRoutes(
+          opts.mapsKey,
+          input,
+          request.body,
+          ctx,
+          doFetch,
+          routesTimeoutMs,
+        );
         const data: RouteData = {
           travelMode: input.travelMode,
           durationMinutes: durationMinutes(route.duration),
@@ -91,7 +103,8 @@ export function createRouteSkill(opts: RouteSkillOptions): SkillRegistry["route"
           status: "ok",
           data,
           sources: [{ name: "Google Maps Routes" }],
-          warnings: [],
+          // The time is real but for leaving now, which the reply has to say.
+          warnings: request.departureMovedToNow ? [LEAVING_NOW_WARNING] : [],
         };
       } catch (err) {
         // The caller gave up (dispatcher timeout or shutdown): stop, don't answer.
@@ -136,6 +149,7 @@ function fallback(
 async function callRoutes(
   key: string,
   input: RouteInput,
+  body: Record<string, unknown>,
   ctx: SkillContext,
   doFetch: typeof fetch,
   timeoutMs: number,
@@ -161,7 +175,7 @@ async function callRoutes(
         "X-Goog-Api-Key": key,
         "X-Goog-FieldMask": fieldMask(input.travelMode),
       },
-      body: JSON.stringify(routesRequest(input, ctx.now)),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     const text = await res.text();

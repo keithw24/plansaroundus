@@ -1,5 +1,6 @@
 import type { RouteInput, TravelMode } from "@aroundus/core";
 import { z } from "zod";
+import { placeIdOf, roundCoord } from "./points.ts";
 
 // Google Routes API, computeRoutes (v2). Request and response shapes follow
 // https://developers.google.com/maps/documentation/routes/reference/rest/v2/TopLevel/computeRoutes
@@ -24,21 +25,33 @@ type Waypoint =
   | { placeId: string }
   | { location: { latLng: { latitude: number; longitude: number } } };
 
-function waypoint(p: { latitude: number; longitude: number; placeId?: string | undefined }) {
-  if (p.placeId) return { placeId: p.placeId } satisfies Waypoint;
+function waypoint(p: {
+  latitude: number;
+  longitude: number;
+  placeId?: string | undefined;
+}): Waypoint {
+  const placeId = placeIdOf(p);
+  if (placeId) return { placeId };
   return {
-    location: { latLng: { latitude: p.latitude, longitude: p.longitude } },
-  } satisfies Waypoint;
+    location: { latLng: { latitude: roundCoord(p.latitude), longitude: roundCoord(p.longitude) } },
+  };
 }
 
+/** Routes accepts past transit departures up to 7 days back. */
+export const TRANSIT_PAST_LIMIT_MS = 7 * 24 * 60 * 60_000;
+
 /**
- * The request body. Mode rules:
- * - TRANSIT takes a departure time; a past one is moved to now.
+ * The request body, and whether the departure had to be moved to now. Mode rules:
+ * - TRANSIT sends the requested departure time, past or future; one more
+ *   than 7 days back (which Routes rejects) becomes now, flagged.
  * - DRIVE is traffic-aware; a departure time is sent only when it's in the
  *   future, because Routes rejects past times for driving.
  * - WALK and BICYCLE take neither a routing preference nor a time.
  */
-export function routesRequest(input: RouteInput, now: Date): Record<string, unknown> {
+export function routesRequest(
+  input: RouteInput,
+  now: Date,
+): { body: Record<string, unknown>; departureMovedToNow: boolean } {
   const body: Record<string, unknown> = {
     origin: waypoint(input.origin),
     destination: waypoint(input.destination),
@@ -47,15 +60,19 @@ export function routesRequest(input: RouteInput, now: Date): Record<string, unkn
     languageCode: "en-US",
     units: "METRIC",
   };
+  let departureMovedToNow = false;
   const departure = new Date(input.departureTime);
   if (input.travelMode === "TRANSIT") {
-    body.departureTime = (departure > now ? departure : now).toISOString();
+    // A minute of slack so "now" from a slightly earlier clock is never rejected.
+    const tooOld = departure.getTime() < now.getTime() - TRANSIT_PAST_LIMIT_MS + 60_000;
+    departureMovedToNow = tooOld;
+    body.departureTime = (tooOld ? now : departure).toISOString();
   } else if (input.travelMode === "DRIVE") {
     body.routingPreference = "TRAFFIC_AWARE";
     // A small margin so a "now" departure doesn't arrive at Google already in the past.
     if (departure.getTime() > now.getTime() + 60_000) body.departureTime = departure.toISOString();
   }
-  return body;
+  return { body, departureMovedToNow };
 }
 
 /** Proto3 JSON drops zero and empty values, so nearly everything is optional. */
@@ -87,11 +104,13 @@ export const RoutesResponse = z.object({
           .regex(/^\d+(\.\d+)?s$/)
           .optional(),
         distanceMeters: z.number().int().nonnegative().optional(),
-        legs: z.array(z.object({ steps: z.array(Step).optional() })).optional(),
+        // Checked separately by transitSummary, so an odd step only drops the summary.
+        legs: z.unknown().optional(),
       }),
     )
     .optional(),
 });
+const Legs = z.array(z.object({ steps: z.array(Step).optional() }));
 export type RoutesResponse = z.infer<typeof RoutesResponse>;
 export type RoutesRoute = NonNullable<RoutesResponse["routes"]>[number];
 
@@ -130,7 +149,10 @@ const MAX_RIDES_SHOWN = 3;
  * (an all-walking "transit" route), so nothing is made up.
  */
 export function transitSummary(route: RoutesRoute): string | undefined {
-  const rides = (route.legs ?? [])
+  // Any malformed step drops the whole summary: a partial one could name the wrong line.
+  const legs = Legs.safeParse(route.legs ?? []);
+  if (!legs.success) return undefined;
+  const rides = legs.data
     .flatMap((leg) => leg.steps ?? [])
     .filter((s) => s.travelMode === "TRANSIT" && s.transitDetails)
     .map((s) => {
