@@ -4,13 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node --env-file-if-exists=../../.env src/main.ts",
-    "migrate": "node --env-file-if-exists=../../.env src/migrate.ts"
+    "start": "node --env-file-if-exists=../../.env src/main.ts"
   },
   "dependencies": {
     "@aroundus/core": "*",
+    "@aroundus/pg": "*",
     "@aroundus/router": "*",
-    "pg": "^8.23.0",
     "zod": "^4.6.5"
   }
 }

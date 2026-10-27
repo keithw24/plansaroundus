@@ -186,7 +186,7 @@ TurnHandler
 
 **Done when:** in the terminal, pasting a location then "hi" returns a canned help reply, and a question with no location returns "Where are you?"
 
-**Running it:** `npm start -w @aroundus/agent` (reads `.env` if present). No keys are needed. In the terminal, `/group on|off` and `/sender <phone or email>` exercise the group-chat and beta-flag paths. With `DATABASE_URL` set (plus `CHAT_KEY_SECRET`, which keys stored chat ids), run `npm run migrate -w @aroundus/agent` first; without it, chat memory is in-process. `INBOX_BATCH_MS` sets the batching window. In group chats each sender is batched separately, a pin with no text waits a little longer for the question that usually follows, and messages that arrive mid-turn go into one follow-up batch.
+**Running it:** `npm start -w @aroundus/agent` (reads `.env` if present). No keys are needed. In the terminal, `/group on|off` and `/sender <phone or email>` exercise the group-chat and beta-flag paths. With `DATABASE_URL` set (plus `CHAT_KEY_SECRET`, which keys stored chat ids), run `npm run migrate` first; without it, chat memory is in-process. `INBOX_BATCH_MS` sets the batching window. In group chats each sender is batched separately, a pin with no text waits a little longer for the question that usually follows, and messages that arrive mid-turn go into one follow-up batch.
 
 ## 6. Phase 3: Gemini intent parser (`router/intent.ts`)
 
