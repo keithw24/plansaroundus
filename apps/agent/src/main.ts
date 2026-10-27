@@ -7,6 +7,7 @@ import {
   geminiGenerate,
   loadConfig,
 } from "@aroundus/core";
+import { createPgQuery } from "@aroundus/pg";
 import { createAgent } from "./agent.ts";
 import type { ChannelAdapter } from "./channel.ts";
 import {
@@ -14,7 +15,6 @@ import {
   createMemoryContextStore,
   createPgContextStore,
 } from "./context-store.ts";
-import { createPgQuery } from "./pg.ts";
 import { createIntentPreviewTurn } from "./replies.ts";
 import { createTerminalAdapter } from "./terminal.ts";
 

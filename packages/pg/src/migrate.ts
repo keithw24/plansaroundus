@@ -1,6 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import pg from "pg";
 
 const SQL_DIR = join(import.meta.dirname, "../../../sql");
@@ -47,14 +46,4 @@ export async function migrate(connectionString: string, log: (line: string) => v
     await client.query("select pg_advisory_unlock($1)", [LOCK_ID]).catch(() => {});
     await client.end();
   }
-}
-
-// Run directly (npm run migrate), not when imported by tests.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const url = process.env.DATABASE_URL?.trim();
-  if (!url) {
-    console.error("DATABASE_URL is not set");
-    process.exit(1);
-  }
-  await migrate(url);
 }

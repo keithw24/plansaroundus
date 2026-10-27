@@ -1,0 +1,14 @@
+{
+  "name": "@aroundus/ingest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=../../.env src/main.ts"
+  },
+  "dependencies": {
+    "@aroundus/core": "*",
+    "@aroundus/pg": "*",
+    "zod": "^4.6.5"
+  }
+}

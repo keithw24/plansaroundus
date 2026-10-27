@@ -1,0 +1,16 @@
+{
+  "name": "@aroundus/pg",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "migrate": "node --env-file-if-exists=../../.env scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@aroundus/core": "*",
+    "pg": "^8.23.0"
+  }
+}

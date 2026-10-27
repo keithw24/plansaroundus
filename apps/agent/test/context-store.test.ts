@@ -1,13 +1,13 @@
 import { silentLogger } from "@aroundus/core";
+import { createPgQuery, migrate } from "@aroundus/pg";
 import { describe, expect, it } from "vitest";
+import { createTestDb } from "../../../test/support/pglite.ts";
 import {
   type ContextStore,
   chatKey,
   createMemoryContextStore,
   createPgContextStore,
 } from "../src/context-store.ts";
-import { migrate } from "../src/migrate.ts";
-import { createPgQuery } from "../src/pg.ts";
 import { pin } from "./fakes.ts";
 
 function contract(
@@ -41,17 +41,18 @@ function contract(
 
 contract("memory context store", async () => ({ store: createMemoryContextStore() }));
 
-// Runs against a real database only when one is provided.
+// In-process Postgres always; a real server too when TEST_DATABASE_URL is set.
+contract("pg context store (PGlite)", async () => {
+  const db = await createTestDb();
+  return { store: createPgContextStore(db.query, "k".repeat(32)), done: db.close };
+});
+
 const testDb = process.env.TEST_DATABASE_URL;
 if (testDb) {
-  contract("pg context store", async () => {
+  contract("pg context store (TEST_DATABASE_URL)", async () => {
     await migrate(testDb, () => {});
     const db = createPgQuery(testDb, silentLogger);
     return { store: createPgContextStore(db.query, "k".repeat(32)), done: db.close };
-  });
-} else {
-  describe.skip("pg context store (set TEST_DATABASE_URL to run)", () => {
-    it("skipped", () => {});
   });
 }
 
