@@ -1,0 +1,18 @@
+{
+  "model": "gemini-flash-lite-latest",
+  "recordedAt": "2026-10-27T01:14:32.284Z",
+  "replies": {
+    "673110b9a10687b8": {
+      "case": "cheap ramen",
+      "reply": "{\"ranked\":[{\"id\":\"places:ChIJfake1\",\"why\":\"closest\"}]}"
+    },
+    "8ae339b968ed6a87": {
+      "case": "date night",
+      "reply": "{\"ranked\":[{\"id\":\"places:ChIJfake5\",\"why\":\"top_rated\"},{\"id\":\"places:ChIJfake2\",\"why\":\"fits_budget\"}]}"
+    },
+    "6d3f0c7f8ea673a4": {
+      "case": "vegan",
+      "reply": "{\n  \"ranked\": [\n    {\n      \"id\": \"places:ChIJfake3\",\n      \"why\": \"matches_cuisine\"\n    }\n  ]\n}"
+    }
+  }
+}

@@ -9,5 +9,9 @@
   "dependencies": {
     "@aroundus/core": "*",
     "zod": "^4.6.5"
+  },
+  "scripts": {
+    "record:rerank": "node --env-file-if-exists=../../../.env scripts/record-rerank.ts",
+    "record:places": "node --env-file-if-exists=../../../.env scripts/record-places.ts"
   }
 }
