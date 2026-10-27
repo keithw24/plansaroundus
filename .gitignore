@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 *.log
+# Agent worktrees (local only)
+.claude/worktrees/
