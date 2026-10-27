@@ -1,18 +1,18 @@
 {
   "model": "gemini-flash-lite-latest",
-  "recordedAt": "2026-10-27T01:08:05.690Z",
+  "recordedAt": "2026-10-27T01:14:32.284Z",
   "replies": {
-    "b661caa259486a59": {
+    "673110b9a10687b8": {
       "case": "cheap ramen",
-      "reply": "{\n  \"ranked\": [\n    {\n      \"id\": \"places:ChIJfake1\",\n      \"reason\": \"It offers cheap ramen very close to Columbia.\"\n    }\n  ]\n}"
+      "reply": "{\"ranked\":[{\"id\":\"places:ChIJfake1\",\"why\":\"closest\"}]}"
     },
-    "164a98085205197f": {
+    "8ae339b968ed6a87": {
       "case": "date night",
-      "reply": "{\n  \"ranked\": [\n    {\n      \"id\": \"places:ChIJfake5\",\n      \"reason\": \"High rating italian restaurant and wine bar with high price level for a nice date.\"\n    },\n    {\n      \"id\": \"places:ChIJfake2\",\n      \"reason\": \"High price level steak house providing a nice atmosphere for a date night.\"\n    }\n  ]\n}"
+      "reply": "{\"ranked\":[{\"id\":\"places:ChIJfake5\",\"why\":\"top_rated\"},{\"id\":\"places:ChIJfake2\",\"why\":\"fits_budget\"}]}"
     },
-    "b47642643f7687a4": {
+    "6d3f0c7f8ea673a4": {
       "case": "vegan",
-      "reply": "{\n  \"ranked\": [\n    {\n      \"id\": \"places:ChIJfake3\",\n      \"reason\": \"It is a vegan restaurant located nearby.\"\n    }\n  ]\n}"
+      "reply": "{\n  \"ranked\": [\n    {\n      \"id\": \"places:ChIJfake3\",\n      \"why\": \"matches_cuisine\"\n    }\n  ]\n}"
     }
   }
 }

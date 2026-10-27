@@ -150,7 +150,8 @@ export type SearchResult = {
 /**
  * Runs one Text Search and returns valid candidates in Places' relevance
  * order, with a requested budget applied: known over-budget places are
- * dropped, and places with no price go after the ones that fit.
+ * dropped, places with no price go after the ones that fit, and for "high"
+ * the high-priced places come first.
  */
 export async function searchPlaces(opts: {
   mapsKey: string;
@@ -165,6 +166,7 @@ export async function searchPlaces(opts: {
   const timeoutMs = opts.timeoutMs ?? PLACES_TIMEOUT_MS;
   const timeout = AbortSignal.timeout(timeoutMs);
   let res: Response;
+  let text: string;
   try {
     res = await opts.fetch(PLACES_SEARCH_URL, {
       method: "POST",
@@ -176,6 +178,8 @@ export async function searchPlaces(opts: {
       body: JSON.stringify(searchBody(opts)),
       signal: AbortSignal.any([opts.signal, timeout]),
     });
+    // Inside the try: the body can time out or fail mid-read too.
+    text = await res.text();
   } catch (err) {
     if (opts.signal.aborted) throw err;
     if (timeout.aborted) {
@@ -186,9 +190,9 @@ export async function searchPlaces(opts: {
     });
   }
 
-  const text = await res.text();
   if (!res.ok) {
-    throw new PlacesError(`Places searchText failed: HTTP ${res.status}${errorDetail(text)}`, {
+    // Status only: Google's message can echo the query, which holds the user's words.
+    throw new PlacesError(`Places searchText failed: HTTP ${res.status}${errorStatus(text)}`, {
       httpStatus: res.status,
     });
   }
@@ -232,6 +236,10 @@ export async function searchPlaces(opts: {
     if (parsed.data.formattedAddress) addresses.set(rec.id, parsed.data.formattedAddress);
     (fit === "unknown" ? unknownPrice : fits).push(rec);
   }
+  // A "high" ask wants a nice place: list high-priced ones first (stable sort).
+  if (opts.budget === "high") {
+    fits.sort((a, b) => Number(b.priceLevel === "high") - Number(a.priceLevel === "high"));
+  }
   return { candidates: [...fits, ...unknownPrice], malformed, filtered, addresses };
 }
 
@@ -257,14 +265,12 @@ function toRecommendation(place: PlaceCandidate, origin: Coordinates): FoodRecom
   };
 }
 
-// Google's error body: { error: { code, message, status } }. Status and a
-// short message only, so logs stay readable.
-function errorDetail(body: string): string {
+// Google's error body: { error: { code, message, status } }. Only the status
+// code word (e.g. RESOURCE_EXHAUSTED), and only if it looks like one.
+function errorStatus(body: string): string {
   try {
-    const err = (JSON.parse(body) as { error?: { status?: unknown; message?: unknown } }).error;
-    const status = typeof err?.status === "string" ? ` ${err.status}` : "";
-    const message = typeof err?.message === "string" ? `: ${err.message.slice(0, 200)}` : "";
-    return `${status}${message}`;
+    const status = (JSON.parse(body) as { error?: { status?: unknown } }).error?.status;
+    return typeof status === "string" && /^[A-Z_]{1,40}$/.test(status) ? ` ${status}` : "";
   } catch {
     return "";
   }

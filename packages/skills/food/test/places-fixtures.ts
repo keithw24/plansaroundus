@@ -73,7 +73,15 @@ export const NEIGHBORHOOD: RawPlace[] = [
     types: ["diner", "breakfast_restaurant", "restaurant"],
     rating: 3.9,
     currentOpeningHours: { openNow: true },
-    priceLevel: undefined,
+    priceLevel: "PRICE_LEVEL_UNSPECIFIED",
+  }),
+  // No opening hours and no rating, as Places returns for some small places.
+  place(8, {
+    name: "Corner Dumpling Stand",
+    types: ["chinese_restaurant", "restaurant", "food"],
+    priceLevel: "PRICE_LEVEL_MODERATE",
+    currentOpeningHours: undefined,
+    rating: undefined,
   }),
 ];
 
@@ -91,11 +99,15 @@ export function fakeFetch(respond: () => Response | Promise<Response>) {
   return { fetch: fn, calls };
 }
 
+/** Places omits `places` entirely when nothing matches; otherwise it may add a nextPageToken. */
 export const placesResponse = (places: unknown[] | undefined): Response =>
-  new Response(JSON.stringify(places === undefined ? {} : { places }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  new Response(
+    JSON.stringify(places === undefined ? {} : { places, nextPageToken: "AeJbb3fake" }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 
 export const googleError = (code: number, status: string, message: string): Response =>
   new Response(JSON.stringify({ error: { code, message, status } }), {
@@ -129,8 +141,23 @@ export type PlacesLiveFixture = {
 };
 
 /** The re-rank cases recorded against Gemini (scripts/record-rerank.ts). */
-export const RERANK_CASES: { name: string; request: string; cuisine: string[] }[] = [
-  { name: "cheap ramen", request: "cheap ramen near columbia?", cuisine: ["ramen"] },
-  { name: "date night", request: "somewhere nice for a date night", cuisine: [] },
+export const RERANK_CASES: {
+  name: string;
+  request: string;
+  cuisine: string[];
+  budget?: "free" | "low" | "medium" | "high";
+}[] = [
+  {
+    name: "cheap ramen",
+    request: "cheap ramen near columbia?",
+    cuisine: ["ramen"],
+    budget: "low",
+  },
+  {
+    name: "date night",
+    request: "somewhere nice for a date night",
+    cuisine: [],
+    budget: "high",
+  },
   { name: "vegan", request: "anything vegan around here", cuisine: ["vegan"] },
 ];

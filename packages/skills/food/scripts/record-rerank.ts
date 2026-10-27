@@ -22,7 +22,7 @@ const { model } = config.gemini;
 const live = geminiGenerate(config.gemini);
 
 // A hard cap on model calls, retries included.
-const MAX_CALLS = 8;
+const MAX_CALLS = 3;
 let calls = 0;
 const byKey = new Map<string, string>();
 const recording: Generate = async (req) => {
@@ -46,6 +46,7 @@ for (const c of RERANK_CASES) {
       {
         origin: COLUMBIA,
         cuisine: c.cuisine,
+        ...(c.budget ? { budget: c.budget } : {}),
         openNow: false,
         request: c.request,
         rerank: true,
@@ -55,7 +56,9 @@ for (const c of RERANK_CASES) {
     const [entry] = byKey;
     if (result.status === "ok" && entry) {
       replies[entry[0]] = { case: c.name, reply: entry[1] };
-      console.log(`ok   ${c.name} → ${result.data.places.map((p) => p.name).join(" | ")}`);
+      console.log(
+        `ok   ${c.name} → ${result.data.places.map((p) => `${p.name}${p.reason ? ` (${p.reason})` : ""}`).join(" | ")}`,
+      );
       break;
     }
     if (attempt === 2 || calls >= MAX_CALLS) throw new Error(`gave up on "${c.name}"`);
