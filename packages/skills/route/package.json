@@ -9,5 +9,8 @@
   "dependencies": {
     "@aroundus/core": "*",
     "zod": "^4.6.5"
+  },
+  "scripts": {
+    "record:routes": "node --env-file-if-exists=../../../.env scripts/record-routes.ts"
   }
 }
